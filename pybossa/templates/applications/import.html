@@ -11,6 +11,20 @@
     </div>
     <div class="span9">
         <h1><strong>{{app.name}}</strong>: Import tasks</h1>
+
+      <h2>From the Europeana API</h2>
+      <form class="form-horizontal" method="post" action="{{ url_for('app.import_task', short_name=app.short_name) }}">
+        <fieldset>
+        {{ europeanaform.hidden_tag() }}
+        <span class="help-inline">Please provide a search time for the image data in {{ active_app }}.<br/> For more information, please look at <a href="http://pybossa.readthedocs.org/en/latest/user/create-application.html#via-the-web-interface" target="_blank">the documentation.</a></span>
+          {{ render_field(europeanaform.europeana_search_term, class_="input-xlarge", placeholder="What to search for (e.g., Rembrandt)") }}
+          <div class="form-actions">
+            <input type="submit" value="Import" class="btn btn-primary" />
+            <a href="{{ url_for('app.settings', short_name=app.short_name) }}" class="btn">Cancel</a>
+          </div>
+        </fieldset>
+      </form>
+
         <h2>From a Google Docs Spreadsheet</h2>
       <form class="form-horizontal" method="post" action="{{ url_for('app.import_task', short_name=app.short_name) }}">
         <fieldset>
@@ -23,6 +37,7 @@
           </div>
         </fieldset>
       </form>
+
       <h2>From a CSV file</h2>
       <form class="form-horizontal" method="post" action="{{ url_for('app.import_task', short_name=app.short_name) }}">
         <fieldset>
@@ -35,6 +50,7 @@
           </div>
         </fieldset>
       </form>
+
     </div>
 </div>
 {% endblock %}

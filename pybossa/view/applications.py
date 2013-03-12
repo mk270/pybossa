@@ -36,6 +36,29 @@ import json
 
 blueprint = Blueprint('app', __name__)
 
+def get_flickr_photos(api_key, search_term, size="big"):
+    import europeana
+    """
+    Gets public photos from Flickr feeds
+    :arg string size: Size of the image from Flickr feed.
+    :returns: A list of photos.
+    :rtype: list
+    """
+    # Get the ID of the photos and load it in the output var
+    # add the 'ids': '25053835@N03' to the values dict if you want to
+    # specify a Flickr Person ID
+
+    # For each photo ID create its direct URL according to its size:
+    # big, medium, small (or thumbnail) + Flickr page hosting the photo
+    import json
+    srch = europeana.search.Search(api_key)
+    results =    srch.query(search_term)
+    photos = results
+    results = [ ("link", "url_m", "title") ]
+    for ph in photos["items"]:
+        results.append( (ph["link"], ph["edmPreview"], ph["title"]) )
+    return results
+
 class CSVImportException(Exception): pass
 
 class AppForm(Form):
@@ -74,6 +97,9 @@ class BulkTaskGDImportForm(Form):
     googledocs_url = TextField('URL', [validators.Required(message="You must "
                 "provide a URL"), validators.URL(message="Oops! That's not a"
                 " valid URL. You must provide a valid URL")])
+class BulkTaskEuropeanaImportForm(Form):
+    europeana_search_term = TextField('URL', [validators.Required(message="You must "
+                "provide a search term")])
 
 
 @blueprint.route('/', defaults={'page': 1})
@@ -410,6 +436,7 @@ def import_task(short_name):
     dataurl = None
     csvform = BulkTaskCSVImportForm(request.form)
     gdform = BulkTaskGDImportForm(request.form)
+    europeanaform = BulkTaskEuropeanaImportForm(request.form)
 
     if app.tasks or (request.args.get('template') or request.method == 'POST'):
 
@@ -433,6 +460,16 @@ def import_task(short_name):
             dataurl = csvform.csv_url.data
         elif 'googledocs_url' in request.form and gdform.validate_on_submit():
             dataurl = ''.join([gdform.googledocs_url.data, '&output=csv'])
+        elif 'europeana_search_term' in request.form and europeanaform.validate_on_submit():
+            api_key = file('/tmp/api-key').read().strip()
+            def reader():
+                for photo in get_flickr_photos(api_key, 
+                                           europeanaform.europeana_search_term.data):
+                    yield photo
+
+            import_tasks(app, reader())
+            flash('Tasks imported successfully!', 'success')
+            return redirect(url_for('.details', short_name=app.short_name))
 
         if dataurl:
             print "dataurl found"
@@ -461,13 +498,15 @@ def import_task(short_name):
                                title=title,
                                app=app,
                                csvform=csvform,
-                               gdform=gdform)
+                               gdform=gdform,
+                               europeanaform=europeanaform)
     else:
         return render_template('/applications/import_options.html',
                         title=title,
                         app=app,
                         csvform=csvform,
-                        gdform=gdform)
+                        gdform=gdform,
+                        europeanaform=euroepanaform)
 
 
 @blueprint.route('/<short_name>/task/<int:task_id>')
