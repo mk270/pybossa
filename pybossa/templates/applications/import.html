@@ -18,32 +18,7 @@
         {{ europeanaform.hidden_tag() }}
         <span class="help-inline">Please provide a search time for the image data in {{ active_app }}.<br/> For more information, please look at <a href="http://pybossa.readthedocs.org/en/latest/user/create-application.html#via-the-web-interface" target="_blank">the documentation.</a></span>
           {{ render_field(europeanaform.europeana_search_term, class_="input-xlarge", placeholder="What to search for (e.g., Rembrandt)") }}
-          <div class="form-actions">
-            <input type="submit" value="Import" class="btn btn-primary" />
-            <a href="{{ url_for('app.settings', short_name=app.short_name) }}" class="btn">Cancel</a>
-          </div>
-        </fieldset>
-      </form>
-
-        <h2>From a Google Docs Spreadsheet</h2>
-      <form class="form-horizontal" method="post" action="{{ url_for('app.import_task', short_name=app.short_name) }}">
-        <fieldset>
-        {{ gdform.hidden_tag() }}
-        <span class="help-inline">Please provide a URL to a Google Docs Spreadsheet with data for {{ active_app }}. <br/> For more information, please look at <a href="http://pybossa.readthedocs.org/en/latest/user/create-application.html#via-the-web-interface" target="_blank">the documentation.</a></span>
-          {{ render_field(gdform.googledocs_url, class_="input-xlarge", placeholder="The URL of the Google Docs Spreadsheet") }}
-          <div class="form-actions">
-            <input type="submit" value="Import" class="btn btn-primary" />
-            <a href="{{ url_for('app.settings', short_name=app.short_name) }}" class="btn">Cancel</a>
-          </div>
-        </fieldset>
-      </form>
-
-      <h2>From a CSV file</h2>
-      <form class="form-horizontal" method="post" action="{{ url_for('app.import_task', short_name=app.short_name) }}">
-        <fieldset>
-        {{ csvform.hidden_tag() }}
-        <span class="help-inline">Please provide a URL to a CSV file with data for {{ active_app }}.<br/> For more information, please look at <a href="http://pybossa.readthedocs.org/en/latest/user/create-application.html#via-the-web-interface" target="_blank">the documentation.</a></span>
-          {{ render_field(csvform.csv_url, class_="input-xlarge", placeholder="The URL of the CSV file") }}
+          {{ render_field(europeanaform.europeana_api_key, class_="input-xlarge", placeholder="Your API key (e.g., pQiJEj5x0)") }}
           <div class="form-actions">
             <input type="submit" value="Import" class="btn btn-primary" />
             <a href="{{ url_for('app.settings', short_name=app.short_name) }}" class="btn">Cancel</a>

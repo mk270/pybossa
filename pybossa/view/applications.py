@@ -54,9 +54,9 @@ def get_flickr_photos(api_key, search_term, size="big"):
     srch = europeana.search.Search(api_key)
     results =    srch.query(search_term)
     photos = results
-    results = [ ("link", "url_m", "title") ]
+    results = [ ("link", "url_b", "title") ]
     for ph in photos["items"]:
-        results.append( (ph["link"], ph["edmPreview"], ph["title"]) )
+        results.append( (ph["link"], ph["edmPreview"][0], ph["title"][0]) )
     return results
 
 class CSVImportException(Exception): pass
@@ -98,8 +98,9 @@ class BulkTaskGDImportForm(Form):
                 "provide a URL"), validators.URL(message="Oops! That's not a"
                 " valid URL. You must provide a valid URL")])
 class BulkTaskEuropeanaImportForm(Form):
-    europeana_search_term = TextField('URL', [validators.Required(message="You must "
+    europeana_search_term = TextField('Search string', [validators.Required(message="You must "
                 "provide a search term")])
+    europeana_api_key = TextField('API key', [validators.Required(message="You must provide a Europeana API key")])
 
 
 @blueprint.route('/', defaults={'page': 1})
@@ -461,10 +462,10 @@ def import_task(short_name):
         elif 'googledocs_url' in request.form and gdform.validate_on_submit():
             dataurl = ''.join([gdform.googledocs_url.data, '&output=csv'])
         elif 'europeana_search_term' in request.form and europeanaform.validate_on_submit():
-            api_key = file('/tmp/api-key').read().strip()
             def reader():
-                for photo in get_flickr_photos(api_key, 
-                                           europeanaform.europeana_search_term.data):
+                for photo in get_flickr_photos(
+                    europeanaform.europeana_api_key.data,
+                    europeanaform.europeana_search_term.data):
                     yield photo
 
             import_tasks(app, reader())
@@ -506,7 +507,7 @@ def import_task(short_name):
                         app=app,
                         csvform=csvform,
                         gdform=gdform,
-                        europeanaform=euroepanaform)
+                        europeanaform=europeanaform)
 
 
 @blueprint.route('/<short_name>/task/<int:task_id>')
