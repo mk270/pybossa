@@ -2,7 +2,12 @@
 
   function getTags(task) {
 	// return task.info.tag_names
-	return [ "Tag1", "Tag2", "Tag3", "Tag4", "Tag5" ];
+	return [ [ { "label": "Yes", "value": "yes6" },
+			   { "label": "tag3", "value": "yes5" },
+			   { "label": "tag4", "value": "yes4" } ],
+			 [ { "label": "Tag5", "value": "yes3" },
+			   { "label": "Tag6", "value": "yes2" },
+			   { "label": "Tagl", "value": "yes1" } ] ];
   };
 
   function loadUserProgress(pybossa, short_name) {
@@ -27,10 +32,19 @@
       img.attr('src', task.info.url_b).css('height', 460);
       img.addClass('img-polaroid');
       task.info.image = img;
-	  var tags = getTags(task);
-	  for(var i = 0; i < tags.length; i++) {
-		console.log(tags[i]);
-	  };
+
+	  var rows = getTags(task);
+	  var buttons_div = $("div#answer");
+	  buttons_div.empty();
+	  for(var row = 0; row < rows.length; row++) {
+		var new_row = $('<div class="row">');
+		for(var col = 0; col < rows[row].length; col++) {
+		  new_row.append('<div class="span2"><button style="width: 100%" class="btn btn-answer" value="' + rows[row][col].value +
+						 '">' + rows[row][col].label + '</button></div>');
+		}
+		buttons_div.append(new_row)
+	  }
+
     }
     else {
       deferred.resolve(task);
