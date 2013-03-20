@@ -2,12 +2,12 @@
 
   function getTags(task) {
 	// return task.info.tag_names
-	return [ [ { "label": "Yes", "value": "yes6" },
-			   { "label": "tag3", "value": "yes5" },
-			   { "label": "tag4", "value": "yes4" } ],
-			 [ { "label": "Tag5", "value": "yes3" },
-			   { "label": "Tag6", "value": "yes2" },
-			   { "label": "Tagl", "value": "yes1" } ] ];
+	return [ [ { "label": "Person", "value": "yes6" },
+			   { "label": "Royal", "value": "yes5" },
+			   { "label": "Animal", "value": "yes4" } ],
+			 [ { "label": "Happy", "value": "yes3" },
+			   { "label": "Smile", "value": "yes2" },
+			   { "label": "Empty", "value": "yes1" } ] ];
   };
 
   function loadUserProgress(pybossa, short_name) {
