@@ -1,5 +1,10 @@
 (function( culttag, $, undefined ) {
 
+  function getTags(task) {
+	// return task.info.tag_names
+	return [ "Tag1", "Tag2", "Tag3", "Tag4", "Tag5" ];
+  };
+
   function loadUserProgress(pybossa, short_name) {
     pybossa.userProgress(short_name).done(function(data){
       var pct = Math.round((data.done*100)/data.total);
@@ -22,6 +27,10 @@
       img.attr('src', task.info.url_b).css('height', 460);
       img.addClass('img-polaroid');
       task.info.image = img;
+	  var tags = getTags(task);
+	  for(var i = 0; i < tags.length; i++) {
+		console.log(tags[i]);
+	  };
     }
     else {
       deferred.resolve(task);
