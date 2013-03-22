@@ -11,7 +11,6 @@
     </div>
     <div class="span9">
         <h1><strong>{{app.name}}</strong>: Import tasks</h1>
-
       <h2>From the Europeana API</h2>
       <form class="form-horizontal" method="post" action="{{ url_for('app.import_task', short_name=app.short_name) }}">
         <fieldset>
