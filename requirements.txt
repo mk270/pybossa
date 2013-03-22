@@ -15,6 +15,6 @@ markdown
 raven
 blinker
 flask-cache
+europeana-search
 flask-heroku
 pygeoip
-europeana-search
