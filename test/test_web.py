@@ -1286,7 +1286,7 @@ class TestWeb:
     def test_43_terms_of_use_and_data(self):
         """Test WEB terms of use is working"""
         res = self.app.get('account/signin', follow_redirects=True)
-        assert "http://okfn.org/terms-of-use/" in res.data, res.data
+        assert "/help/terms-of-use" in res.data, res.data
         assert "http://opendatacommons.org/licenses/by/" in res.data, res.data
 
         res = self.app.get('account/register', follow_redirects=True)
@@ -1745,3 +1745,11 @@ class TestWeb:
         res = self.app.get(url, follow_redirects=True)
         err_msg = "There should be a Global Statistics page of the project"
         assert "General Statistics" in res.data, err_msg
+
+    def test_59_help_api(self):
+        """Test WEB help api page exists"""
+        Fixtures.create()
+        url = "/help/api"
+        res = self.app.get(url, follow_redirects=True)
+        err_msg = "There should be a help api.html page"
+        assert "API Help" in res.data, err_msg
