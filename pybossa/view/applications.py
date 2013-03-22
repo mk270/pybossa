@@ -34,7 +34,7 @@ from pybossa.util import Unique, Pagination, unicode_csv_reader, UnicodeWriter
 from pybossa.auth import require
 from pybossa.cache import apps as cached_apps
 
-from get_photos import get_flickr_photos
+from get_photos import get_flickr_photos, BulkTaskEuropeanaImportForm
 
 import json
 
@@ -80,10 +80,6 @@ class BulkTaskGDImportForm(Form):
     googledocs_url = TextField('URL', [validators.Required(message="You must "
                 "provide a URL"), validators.URL(message="Oops! That's not a"
                 " valid URL. You must provide a valid URL")])
-class BulkTaskEuropeanaImportForm(Form):
-    europeana_search_term = TextField('Search string', [validators.Required(message="You must "
-                "provide a search term")])
-    europeana_api_key = TextField('API key', [validators.Required(message="You must provide a Europeana API key")])
 
 
 @blueprint.route('/', defaults={'page': 1})
