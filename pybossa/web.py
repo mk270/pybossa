@@ -13,8 +13,10 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with PyBOSSA.  If not, see <http://www.gnu.org/licenses/>.
 
+import os
 import logging
 import json
+import os
 
 from flask import Response, request, g, render_template,\
         abort, flash, redirect, session, url_for
@@ -78,6 +80,14 @@ except Exception as inst:
     print inst
     print "Google singin disabled"
 
+# Check if app stats page can generate the map
+geolite = app.root_path + '/../dat/GeoLiteCity.dat'
+if not os.path.exists(geolite):
+    app.config['GEO'] = False
+    print("GeoLiteCity.dat file not found")
+    print("App page stats web map disabled")
+else:
+    app.config['GEO'] = True
 
 
 def url_for_other_page(page):
@@ -185,7 +195,14 @@ def search():
     """Render search results page"""
     return render_template("/home/search.html")
 
+def get_port():
+    port = os.environ.get('PORT', '')
+    if port.isdigit():
+        return int(port)
+    else:
+        return app.config['PORT']
+
 if __name__ == "__main__":
     logging.basicConfig(level=logging.NOTSET)
-    app.run(host=app.config['HOST'], port=app.config['PORT'],
+    app.run(host=app.config['HOST'], port=get_port(),
             debug=app.config.get('DEBUG', True))
