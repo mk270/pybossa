@@ -43,6 +43,7 @@ blueprint = Blueprint('app', __name__)
 
 class CSVImportException(Exception): pass
 
+
 class AppForm(Form):
     id = IntegerField(label=None, widget=HiddenInput())
     name = TextField('Name',
