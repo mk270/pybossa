@@ -34,11 +34,12 @@ from pybossa.cache import apps as cached_apps
 from get_photos import get_flickr_photos, BulkTaskEuropeanaImportForm
 
 import json
+import sys
 
 blueprint = Blueprint('app', __name__)
 
 
-class CSVImportException(Exception):
+class BulkImportException(Exception):
     pass
 
 
@@ -87,6 +88,15 @@ class BulkTaskGDImportForm(Form):
     googledocs_url = TextField('URL',
                                [validators.Required(message=msg_required),
                                    validators.URL(message=msg_url)])
+
+
+class BulkTaskEpiCollectPlusImportForm(Form):
+    msg_required = "You must provide an EpiCollect Plus project name"
+    msg_form_required = "You must provide a Form name for the project"
+    epicollect_project = TextField('Project Name',
+                               [validators.Required(message=msg_required)])
+    epicollect_form = TextField('Form name',
+                               [validators.Required(message=msg_required)])
 
 
 @blueprint.route('/', defaults={'page': 1})
@@ -197,55 +207,58 @@ def new():
 def task_presenter_editor(short_name):
     errors = False
     app = App.query.filter_by(short_name=short_name).first()
-    if app:
-        title = "Application: %s &middot; Task Presenter Editor" % app.name
-        if require.app.update(app):
-            form = TaskPresenterForm(request.form)
-            if request.method == 'POST' and form.validate():
-                app.info['task_presenter'] = form.editor.data
-                db.session.add(app)
-                db.session.commit()
-                flash('<i class="icon-ok"></i> Task presenter added!', 'success')
-                return redirect(url_for('.settings', short_name=app.short_name))
-            if request.method == 'POST' and not form.validate():
-                flash('Please correct the errors', 'error')
-                errors = True
-
-            if request.method == 'GET':
-                if app.info.get('task_presenter'):
-                    form.editor.data = app.info['task_presenter']
-                else:
-                    if request.args.get('template'):
-                        tmpl_uri = "applications/snippets/%s.html" \
-                                   % request.args.get('template')
-                        tmpl = render_template(tmpl_uri, app=app)
-                        form.editor.data = tmpl
-                        msg = 'Your code will be <em>automagically</em> rendered in \
-                              the <strong>preview section</strong>. Click in the \
-                              preview button!'
-                        flash(msg, 'info')
-                    else:
-                        msg = '<strong>Note</strong> You will need to upload ' \
-                              'the tasks using the <a href="%s">' \
-                              'CSV importer</a> or download the app ' \
-                              'bundle and run the <strong>createTasks.py ' \
-                              '</strong> script in your ' \
-                              'computer' % url_for('app.import_task',
-                                                   short_name=app.short_name)
-                        flash(msg, 'info')
-                        return render_template(
-                            'applications/task_presenter_options.html',
-                            title=title,
-                            app=app)
-                return render_template('applications/task_presenter_editor.html',
-                                       title=title,
-                                       form=form,
-                                       app=app,
-                                       errors=errors)
-        else:
-            abort(403)
-    else:
+    if not app:
         abort(404)
+
+    title = "Application: %s &middot; Task Presenter Editor" % app.name
+    if not require.app.update(app):
+        abort(403)
+
+    form = TaskPresenterForm(request.form)
+    if request.method == 'POST' and form.validate():
+        app.info['task_presenter'] = form.editor.data
+        db.session.add(app)
+        db.session.commit()
+        flash('<i class="icon-ok"></i> Task presenter added!', 'success')
+        return redirect(url_for('.settings', short_name=app.short_name))
+
+    if request.method == 'POST' and not form.validate():
+        flash('Please correct the errors', 'error')
+        errors = True
+
+    if request.method != 'GET':
+        return
+
+    if app.info.get('task_presenter'):
+        form.editor.data = app.info['task_presenter']
+    else:
+        if request.args.get('template'):
+            tmpl_uri = "applications/snippets/%s.html" \
+                % request.args.get('template')
+            tmpl = render_template(tmpl_uri, app=app)
+            form.editor.data = tmpl
+            msg = 'Your code will be <em>automagically</em> rendered in \
+                      the <strong>preview section</strong>. Click in the \
+                      preview button!'
+            flash(msg, 'info')
+        else:
+            msg = '<strong>Note</strong> You will need to upload ' \
+                'the tasks using the <a href="%s">' \
+                'CSV importer</a> or download the app ' \
+                'bundle and run the <strong>createTasks.py ' \
+                '</strong> script in your ' \
+                'computer' % url_for('app.import_task',
+                                     short_name=app.short_name)
+            flash(msg, 'info')
+            return render_template(
+                'applications/task_presenter_options.html',
+                title=title,
+                app=app)
+    return render_template('applications/task_presenter_editor.html',
+                           title=title,
+                           form=form,
+                           app=app,
+                           errors=errors)
 
 
 @blueprint.route('/<short_name>/delete', methods=['GET', 'POST'])
@@ -387,7 +400,7 @@ def settings(short_name):
         abort(404)
 
 
-def import_tasks(app, csvreader):
+def import_csv_tasks(app, csvreader):
     headers = []
     fields = set(['state', 'quorum', 'calibration', 'priority_0',
                   'n_answers'])
@@ -395,10 +408,11 @@ def import_tasks(app, csvreader):
     empty = True
 
     for row in csvreader:
+        print row
         if not headers:
             headers = row
             if len(headers) != len(set(headers)):
-                raise CSVImportException('The file you uploaded has two headers with'
+                raise BulkImportException('The file you uploaded has two headers with'
                                          ' the same name.')
             field_headers = set(headers) & fields
             for field in field_headers:
@@ -416,7 +430,15 @@ def import_tasks(app, csvreader):
             db.session.commit()
             empty = False
     if empty:
-        raise CSVImportException('Oops! It looks like the file is empty.')
+        raise BulkImportException('Oops! It looks like the file is empty.')
+
+
+def import_epicollect_tasks(app, data):
+    for d in data:
+        task = model.Task(app=app)
+        task.info = d
+        db.session.add(task)
+    db.session.commit()
 
 
 @blueprint.route('/<short_name>/import', methods=['GET', 'POST'])
@@ -428,12 +450,16 @@ def import_task(short_name):
     csvform = BulkTaskCSVImportForm(request.form)
     gdform = BulkTaskGDImportForm(request.form)
     europeanaform = BulkTaskEuropeanaImportForm(request.form)
+    epiform = BulkTaskEpiCollectPlusImportForm(request.form)
 
     if app.tasks or (request.args.get('template') or request.method == 'POST'):
 
         googledocs_urls = {
             'image': "https://docs.google.com/spreadsheet/ccc"
                      "?key=0AsNlt0WgPAHwdHFEN29mZUF0czJWMUhIejF6dWZXdkE"
+                     "&usp=sharing",
+            'sound': "https://docs.google.com/spreadsheet/ccc"
+                     "?key=0AsNlt0WgPAHwdEczcWduOXRUb1JUc1VGMmJtc2xXaXc"
                      "&usp=sharing",
             'map': "https://docs.google.com/spreadsheet/ccc"
                    "?key=0AsNlt0WgPAHwdGZnbjdwcnhKRVNlN1dGXy0tTnNWWXc"
@@ -443,6 +469,7 @@ def import_task(short_name):
                    "&usp=sharing"}
 
         template = request.args.get('template')
+
         if template in googledocs_urls:
             gdform.googledocs_url.data = googledocs_urls[template]
 
@@ -457,40 +484,64 @@ def import_task(short_name):
                     europeanaform.europeana_search_term.data):
                     yield photo
 
-            import_tasks(app, reader())
+            import_csv_tasks(app, reader())
             flash('Tasks imported successfully!', 'success')
             return redirect(url_for('.details', short_name=app.short_name))
+        elif 'epicollect_project' in request.form and epiform.validate_on_submit():
+            dataurl = 'http://plus.epicollect.net/%s/%s.json' % \
+                      (epiform.epicollect_project.data, epiform.epicollect_form.data)
 
         if dataurl:
-            print "dataurl found"
             try:
                 r = requests.get(dataurl)
-                if r.status_code == 403:
-                    raise CSVImportException("Oops! It looks like you don't have permission to access"
-                                             " that file!", 'error')
-                if ((not 'text/plain' in r.headers['content-type']) and
-                   (not 'text/csv' in r.headers['content-type'])):
-                    msg = "Oops! That file doesn't look like the right file."
-                    raise CSVImportException(msg, 'error')
 
-                csvcontent = StringIO(r.text)
-                csvreader = unicode_csv_reader(csvcontent)
+                if 'csv_url' in request.form or 'googledocs_url' in request.form:
+                    if r.status_code == 403:
+                        msg = "Oops! It looks like you don't have permission to access" \
+                              " that file"
+                        raise BulkImportException(msg, 'error')
+                    if ((not 'text/plain' in r.headers['content-type']) and
+                       (not 'text/csv' in r.headers['content-type'])):
+                        msg = "Oops! That file doesn't look like the right file."
+                        raise BulkImportException(msg, 'error')
 
-                # TODO: check for errors
-                import_tasks(app, csvreader)
+                    csvcontent = StringIO(r.text)
+                    csvreader = unicode_csv_reader(csvcontent)
+                    import_csv_tasks(app, csvreader)
+
+                    # TODO: check for errors
+                elif 'epicollect_project' in request.form:
+                    if r.status_code == 403:
+                        msg = "Oops! It looks like you don't have permission to access" \
+                              " the EpiCollect Plus project"
+                        raise BulkImportException(msg, 'error')
+                    if not 'application/json' in r.headers['content-type']:
+                        msg = "Oops! That project and form do not look like the right one."
+                        raise BulkImportException(msg, 'error')
+                    import_epicollect_tasks(app, json.loads(r.text))
                 flash('Tasks imported successfully!', 'success')
-                return redirect(url_for('.details', short_name=app.short_name))
-            except CSVImportException, err_msg:
+                return redirect(url_for('.settings', short_name=app.short_name))
+            except BulkImportException, err_msg:
                 flash(err_msg, 'error')
-            except:
+            except Exception as inst:
+                print type(inst)
+                print inst.args
+                print inst
                 msg = 'Oops! Looks like there was an error with processing that file!'
                 flash(msg, 'error')
-        return render_template('/applications/import.html',
-                               title=title,
-                               app=app,
-                               csvform=csvform,
-                               gdform=gdform,
-                               europeanaform=europeanaform)
+
+        tmpl = '/applications/import.html'
+
+        if template == 'epicollect':
+            return render_template(tmpl, title=title, app=app, epiform=epiform)
+        elif (template == 'image' or template == 'map'
+              or template == 'pdf' or template == 'sound'):
+            return render_template(tmpl, title=title, app=app, gdform=gdform)
+        else:
+            return render_template(tmpl, title=title, app=app,
+                                   csvform=csvform,
+                                   gdform=gdform,
+                                   europeanaform=europeanaform)
     else:
         return render_template('/applications/import_options.html',
                                title=title,
@@ -725,102 +776,83 @@ def export_to(short_name):
         title = "Application: %s &middot; Export" % app.name
     else:
         title = "Application not found"
-    if request.args.get('format') and request.args.get('type'):
-        if request.args.get('format') == 'json':
-            if request.args.get('type') == 'task':
-                def gen_json_tasks():
-                    n = db.session.query(model.Task)\
-                          .filter_by(app_id=app.id).count()
-                    i = 0
-                    yield "["
-                    for t in db.session.query(model.Task)\
-                               .filter_by(app_id=app.id).yield_per(1):
-                        i += 1
-                        if (i != n):
-                            yield json.dumps(t.dictize()) + ", "
-                        else:
-                            yield json.dumps(t.dictize())
 
-                    yield "]"
-                return Response(gen_json_tasks(), mimetype='application/json')
-            elif request.args.get('type') == 'task_run':
-                def gen_json_task_runs():
-                    n = db.session.query(model.TaskRun)\
-                                  .filter_by(app_id=app.id).count()
-                    i = 0
-                    yield "["
-                    for tr in db.session.query(model.TaskRun)\
-                                .filter_by(app_id=app.id).yield_per(1):
-                        i += 1
-                        if (i != n):
-                            yield json.dumps(tr.dictize()) + ", "
-                        else:
-                            yield json.dumps(tr.dictize())
+    def gen_json(table):
+        n = db.session.query(table)\
+            .filter_by(app_id=app.id).count()
+        sep = ", "
+        yield "["
+        for i, tr in enumerate(db.session.query(table)\
+                .filter_by(app_id=app.id).yield_per(1), 1):
+            item = json.dumps(tr.dictize())
+            if (i == n):
+                sep = ""
+            yield item + sep
+        yield "]"
 
-                    yield "]"
-                return Response(gen_json_task_runs(),
-                                mimetype='application/json')
-            else:
+    def handle_task(writer, t):
+        writer.writerow(t.info.values())
+
+    def handle_task_run(writer, t):
+        if (type(t.info) == dict):
+            writer.writerow(t.info.values())
+        else:
+            writer.writerow([t.info])
+
+    def get_csv(out, writer, table, handle_row):
+        for tr in db.session.query(table)\
+                .filter_by(app_id=app.id)\
+                .yield_per(1):
+            handle_row(writer, tr)
+        yield out.getvalue()
+
+    ty = request.args.get('type')
+    fmt = request.args.get('format')
+    if fmt and ty:
+        if fmt not in ["json", "csv"]:
+            abort(404)
+        if fmt == 'json':
+            tables = {"task": model.Task, "task_run": model.TaskRun}
+            try:
+                table = tables[ty]
+            except KeyError:
                 return abort(404)
-        elif request.args.get('format') == 'csv':
-            # Export Tasks to CSV
-            if request.args.get('type') == 'task':
-                out = StringIO()
-                #writer = csv.writer(out)
-                writer = UnicodeWriter(out)
-                t = db.session.query(model.Task)\
-                      .filter_by(app_id=app.id)\
-                      .first()
-                if t is not None:
+            return Response(gen_json(table), mimetype='application/json')
+        elif fmt == 'csv':
+            # Export Task(/Runs) to CSV
+            types = {
+                "task": (
+                    model.Task, handle_task,
+                    (lambda x: True),
+                    "Oops, the application does not have tasks to \
+                           export, if you are the owner add some tasks"),
+                "task_run": (
+                    model.TaskRun, handle_task_run,
+                    (lambda x: type(x.info) == dict),
+                    "Oops, there are no Task Runs yet to export, invite \
+                           some users to participate")
+                }
+            try:
+                table, handle_row, test, msg = types[ty]
+            except KeyError:
+                return abort(404)
+
+            out = StringIO()
+            writer = UnicodeWriter(out)
+            t = db.session.query(table)\
+                .filter_by(app_id=app.id)\
+                .first()
+            if t is not None:
+                if test(t):
                     writer.writerow(t.info.keys())
 
-                    def get_csv_task():
-                        for t in db.session.query(model.Task)\
-                                   .filter_by(app_id=app.id)\
-                                   .yield_per(1):
-                            writer.writerow(t.info.values())
-                        yield out.getvalue()
-                    return Response(get_csv_task(), mimetype='text/csv')
-                else:
-                    msg = "Oops, the application does not have tasks to \
-                           export, if you are the owner add some tasks"
-                    flash(msg, 'info')
-                    return render_template('/applications/export.html',
-                                           title=title,
-                                           app=app)
-
-            # Export Task Runs to CSV
-            elif request.args.get('type') == 'task_run':
-                out = StringIO()
-                writer = UnicodeWriter(out)
-                tr = db.session.query(model.TaskRun)\
-                       .filter_by(app_id=app.id)\
-                       .first()
-                if tr is not None:
-                    if (type(tr.info) == dict):
-                        writer.writerow(tr.info.keys())
-
-                    def get_csv_task_run():
-                        for tr in db.session.query(model.TaskRun)\
-                                    .filter_by(app_id=app.id)\
-                                    .yield_per(1):
-                            if (type(tr.info) == dict):
-                                writer.writerow(tr.info.values())
-                            else:
-                                writer.writerow([tr.info])
-                        yield out.getvalue()
-                    return Response(get_csv_task_run(), mimetype='text/csv')
-                else:
-                    msg = "Oops, there are no Task Runs yet to export, invite \
-                           some users to participate"
-                    flash(msg, 'info')
-                    return render_template('/applications/export.html',
-                                           title=title,
-                                           app=app)
+                return Response(get_csv(out, writer, table, handle_row), 
+                                mimetype='text/csv')
             else:
-                abort(404)
-        else:
-            abort(404)
+                flash(msg, 'info')
+                return render_template('/applications/export.html',
+                                       title=title,
+                                       app=app)
     elif len(request.args) >= 1:
         abort(404)
     else:
