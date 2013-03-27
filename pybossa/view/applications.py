@@ -536,7 +536,8 @@ def import_task(short_name):
             return render_template(tmpl, title=title, app=app, epiform=epiform)
         elif (template == 'image' or template == 'map'
               or template == 'pdf' or template == 'sound'):
-            return render_template(tmpl, title=title, app=app, gdform=gdform)
+            return render_template(tmpl, title=title, app=app, gdform=gdform,
+                                   europeanaform=europeanaform)
         else:
             return render_template(tmpl, title=title, app=app,
                                    csvform=csvform,
