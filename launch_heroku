@@ -1,0 +1,19 @@
+#!/bin/bash
+
+set -eu
+
+HEROKU_INSTANCE=$1
+BRANCH=master
+
+heroku create $HEROKU_INSTANCE -s cedar
+git remote add heroku git@heroku.com:${HEROKU_INSTANCE}.git
+heroku addons:add heroku-postgresql
+
+PG_INSTANCE=$(which-heroku-pg)
+
+heroku pg:promote $PG_INSTANCE
+git push heroku ${BRANCH}:master
+
+heroku run "python cli.py db_create"
+heroku ps:scale web=1
+
