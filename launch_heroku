@@ -3,7 +3,7 @@
 set -eu
 
 HEROKU_INSTANCE=$1
-BRANCH=master
+BRANCH=$2
 
 heroku create $HEROKU_INSTANCE -s cedar
 git remote add heroku git@heroku.com:${HEROKU_INSTANCE}.git
