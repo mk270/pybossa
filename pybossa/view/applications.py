@@ -539,24 +539,34 @@ def import_task(short_name):
         return redirect(url_for('.details', short_name=app.short_name))
 
     dataurl = get_data_url(**template_args)
-    if dataurl:
-        try:
-            r = requests.get(dataurl)
-            if 'csv_url' in request.form or 'googledocs_url' in request.form:
-                get_data_from_request(app, r)
-            elif 'epicollect_project' in request.form:
-                get_epicollect_data_from_request(app, r)
-            flash(lazy_gettext('Tasks imported successfully!'), 'success')
-            return redirect(url_for('.settings', short_name=app.short_name))
-        except BulkImportException, err_msg:
-            flash(err_msg, 'error')
-        except Exception as inst:
-            msg = 'Oops! Looks like there was an error with processing that file!'
-            flash(lazy_gettext(msg), 'error')
 
-    tmpl = '/applications/import.html'
-    
-    return render_template(tmpl, **template_args)
+    def render_forms():
+        tmpl = '/applications/import.html'    
+        return render_template(tmpl, **template_args)
+
+    if not dataurl:
+        return render_forms()
+
+    data_handlers = [
+        ('csv_url', get_data_from_request),
+        ('googledocs_url', get_data_from_request),
+        ('epicollect_project', get_epicollect_data_from_request)
+        ]
+
+    try:
+        r = requests.get(dataurl)
+        for form_id, handler in data_handlers:
+            if form_id in request.form:
+                handler(app, r)
+                break
+        flash(lazy_gettext('Tasks imported successfully!'), 'success')
+        return redirect(url_for('.settings', short_name=app.short_name))
+    except BulkImportException, err_msg:
+        flash(err_msg, 'error')
+    except Exception as inst:
+        msg = 'Oops! Looks like there was an error with processing that file!'
+        flash(lazy_gettext(msg), 'error')
+    return render_forms()
 
 @blueprint.route('/<short_name>/task/<int:task_id>')
 def task_presenter(short_name, task_id):
