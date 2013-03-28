@@ -32,6 +32,8 @@ from pybossa.util import Unique, Pagination, unicode_csv_reader, UnicodeWriter
 from pybossa.auth import require
 from pybossa.cache import apps as cached_apps
 
+from get_photos import get_flickr_photos, BulkTaskEuropeanaImportForm
+
 import json
 import sys
 
@@ -451,6 +453,7 @@ def import_task(short_name):
     dataurl = None
     csvform = BulkTaskCSVImportForm(request.form)
     gdform = BulkTaskGDImportForm(request.form)
+    europeanaform = BulkTaskEuropeanaImportForm(request.form)
     epiform = BulkTaskEpiCollectPlusImportForm(request.form)
 
     if not (app.tasks or (request.args.get('template') or request.method == 'POST')):
@@ -483,6 +486,16 @@ def import_task(short_name):
             dataurl = csvform.csv_url.data
         elif 'googledocs_url' in request.form and gdform.validate_on_submit():
             dataurl = ''.join([gdform.googledocs_url.data, '&output=csv'])
+        elif 'europeana_search_term' in request.form and europeanaform.validate_on_submit():
+            def reader():
+                for photo in get_flickr_photos(
+                    europeanaform.europeana_api_key.data,
+                    europeanaform.europeana_search_term.data):
+                    yield photo
+
+            import_csv_tasks(app, reader())
+            flash('Tasks imported successfully!', 'success')
+            return redirect(url_for('.details', short_name=app.short_name))
         elif 'epicollect_project' in request.form and epiform.validate_on_submit():
             dataurl = 'http://plus.epicollect.net/%s/%s.json' % \
                       (epiform.epicollect_project.data, epiform.epicollect_form.data)
@@ -536,7 +549,8 @@ def import_task(short_name):
         else:
             return render_template(tmpl, title=title, app=app,
                                    csvform=csvform,
-                                   gdform=gdform)
+                                   gdform=gdform,
+                                   europeanaform=europeanaform)
 
 @blueprint.route('/<short_name>/task/<int:task_id>')
 def task_presenter(short_name, task_id):
