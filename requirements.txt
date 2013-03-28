@@ -18,3 +18,4 @@ flask-cache
 europeana-search
 flask-heroku
 pygeoip
+flask-babel

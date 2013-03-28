@@ -20,6 +20,7 @@ from flask import render_template, make_response
 from flaskext.wtf import Form, IntegerField, TextField, BooleanField, \
     SelectField, validators, HiddenInput, TextAreaField
 from flaskext.login import login_required, current_user
+from flaskext.babel import lazy_gettext
 from werkzeug.exceptions import HTTPException
 
 import pybossa.model as model
@@ -45,28 +46,28 @@ class BulkImportException(Exception):
 
 class AppForm(Form):
     id = IntegerField(label=None, widget=HiddenInput())
-    name = TextField('Name',
+    name = TextField(lazy_gettext('Name'),
                      [validators.Required(),
                       Unique(db.session, model.App, model.App.name,
                              message="Name is already taken.")])
-    short_name = TextField('Short Name',
+    short_name = TextField(lazy_gettext('Short Name'),
                            [validators.Required(),
                             Unique(db.session, model.App, model.App.short_name,
-                                   message="Short Name is already taken.")])
-    description = TextField('Description',
+                                   message=lazy_gettext("Short Name is already taken."))])
+    description = TextField(lazy_gettext('Description'),
                             [validators.Required(
-                                message="You must provide a description.")])
-    thumbnail = TextField('Icon Link')
-    allow_anonymous_contributors = SelectField('Allow Anonymous Contributors',
-                                               choices=[('True', 'Yes'),
-                                                        ('False', 'No')])
-    long_description = TextAreaField('Long Description')
-    sched = SelectField('Task Scheduler',
-                        choices=[('default', 'Default'),
-                                 ('breadth_first', 'Breadth First'),
-                                 ('depth_first', 'Depth First'),
-                                 ('random', 'Random')],)
-    hidden = BooleanField('Hide?')
+                                message=lazy_gettext("You must provide a description."))])
+    thumbnail = TextField(lazy_gettext('Icon Link'))
+    allow_anonymous_contributors = SelectField(lazy_gettext('Allow Anonymous Contributors'),
+                                               choices=[('True', lazy_gettext('Yes')),
+                                                        ('False', lazy_gettext('No'))])
+    long_description = TextAreaField(lazy_gettext('Long Description'))
+    sched = SelectField(lazy_gettext('Task Scheduler'),
+                        choices=[('default', lazy_gettext('Default')),
+                                 ('breadth_first', lazy_gettext('Breadth First')),
+                                 ('depth_first', lazy_gettext('Depth First')),
+                                 ('random', lazy_gettext('Random'))],)
+    hidden = BooleanField(lazy_gettext('Hide?'))
 
 
 class TaskPresenterForm(Form):
@@ -75,27 +76,27 @@ class TaskPresenterForm(Form):
 
 
 class BulkTaskCSVImportForm(Form):
-    msg_required = "You must provide a URL"
-    msg_url = "Oops! That's not a valid URL. You must provide a valid URL"
-    csv_url = TextField('URL',
+    msg_required = lazy_gettext("You must provide a URL")
+    msg_url = lazy_gettext("Oops! That's not a valid URL. You must provide a valid URL")
+    csv_url = TextField(lazy_gettext('URL'),
                         [validators.Required(message=msg_required),
                          validators.URL(message=msg_url)])
 
 
 class BulkTaskGDImportForm(Form):
-    msg_required = "You must provide a URL"
-    msg_url = "Oops! That's not a valid URL. You must provide a valid URL"
-    googledocs_url = TextField('URL',
+    msg_required = lazy_gettext("You must provide a URL")
+    msg_url = lazy_gettext("Oops! That's not a valid URL. You must provide a valid URL")
+    googledocs_url = TextField(lazy_gettext('URL'),
                                [validators.Required(message=msg_required),
                                    validators.URL(message=msg_url)])
 
 
 class BulkTaskEpiCollectPlusImportForm(Form):
-    msg_required = "You must provide an EpiCollect Plus project name"
-    msg_form_required = "You must provide a Form name for the project"
-    epicollect_project = TextField('Project Name',
+    msg_required = lazy_gettext("You must provide an EpiCollect Plus project name")
+    msg_form_required = lazy_gettext("You must provide a Form name for the project")
+    epicollect_project = TextField(lazy_gettext('Project Name'),
                                [validators.Required(message=msg_required)])
-    epicollect_form = TextField('Form name',
+    epicollect_form = TextField(lazy_gettext('Form name'),
                                [validators.Required(message=msg_required)])
 
 
@@ -111,7 +112,7 @@ def index(page):
         if apps:
             pagination = Pagination(page, per_page, count)
             return render_template('/applications/index.html',
-                                   title="Applications",
+                                   title=lazy_gettext("Applications"),
                                    apps=apps,
                                    pagination=pagination,
                                    app_type='app-featured')
@@ -132,7 +133,7 @@ def published(page):
 
         pagination = Pagination(page, per_page, count)
         return render_template('/applications/index.html',
-                               title="Applications",
+                               title=lazy_gettext("Applications"),
                                apps=apps,
                                count=count,
                                pagination=pagination,
@@ -151,7 +152,7 @@ def draft(page):
 
         pagination = Pagination(page, per_page, count)
         return render_template('/applications/index.html',
-                               title="Applications",
+                               title=lazy_gettext("Applications"),
                                apps=apps,
                                count=count,
                                pagination=pagination,
@@ -186,17 +187,18 @@ def new():
             db.session.add(app)
             db.session.commit()
             # Clean cache
-            flash('<i class="icon-ok"></i> Application created!', 'success')
-            flash('<i class="icon-bullhorn"></i> You can check the '
-                  '<strong><a href="https://docs.pybossa.com">Guide and '
-                  ' Documentation</a></strong> for adding tasks, '
-                  ' a thumbnail, using PyBossa.JS, etc.', 'info')
+            msg_1 = lazy_gettext('Application created!')
+            flash('<i class="icon-ok"></i> ' + msg_1, 'success')
+            flash('<i class="icon-bullhorn"></i> ' + lazy_gettext('You can check the ') +
+                  '<strong><a href="https://docs.pybossa.com">' + lazy_gettext('Guide and '
+                  ' Documentation') + '</a></strong> ' + lazy_gettext('for adding tasks, '
+                  ' a thumbnail, using PyBossa.JS, etc.'), 'info')
             return redirect(url_for('.settings', short_name=app.short_name))
         if request.method == 'POST' and not form.validate():
-            flash('Please correct the errors', 'error')
+            flash(lazy_gettext('Please correct the errors'), 'error')
             errors = True
         return render_template('applications/new.html',
-                               title="Create an Application",
+                               title=lazy_gettext("Create an Application"),
                                form=form, errors=errors)
     else:
         abort(403)
@@ -207,6 +209,7 @@ def new():
 def task_presenter_editor(short_name):
     errors = False
     app = App.query.filter_by(short_name=short_name).first()
+
     if not app:
         abort(404)
 
@@ -219,11 +222,12 @@ def task_presenter_editor(short_name):
         app.info['task_presenter'] = form.editor.data
         db.session.add(app)
         db.session.commit()
-        flash('<i class="icon-ok"></i> Task presenter added!', 'success')
+        msg_1 = lazy_gettext('Task presenter added!')
+        flash('<i class="icon-ok"></i> ' + msg_1, 'success')
         return redirect(url_for('.settings', short_name=app.short_name))
 
     if request.method == 'POST' and not form.validate():
-        flash('Please correct the errors', 'error')
+        flash(lazy_gettext('Please correct the errors'), 'error')
         errors = True
 
     if request.method != 'GET':
@@ -240,7 +244,7 @@ def task_presenter_editor(short_name):
             msg = 'Your code will be <em>automagically</em> rendered in \
                       the <strong>preview section</strong>. Click in the \
                       preview button!'
-            flash(msg, 'info')
+            flash(lazy_gettext(msg), 'info')
         else:
             msg = '<strong>Note</strong> You will need to upload ' \
                 'the tasks using the <a href="%s">' \
@@ -249,7 +253,7 @@ def task_presenter_editor(short_name):
                 '</strong> script in your ' \
                 'computer' % url_for('app.import_task',
                                      short_name=app.short_name)
-            flash(msg, 'info')
+            flash(lazy_gettext(msg), 'info')
             return render_template(
                 'applications/task_presenter_options.html',
                 title=title,
@@ -277,7 +281,7 @@ def delete(short_name):
                 cached_apps.clean(app.id)
                 db.session.delete(app)
                 db.session.commit()
-                flash('Application deleted!', 'success')
+                flash(lazy_gettext('Application deleted!'), 'success')
                 return redirect(url_for('account.profile'))
         else:
             abort(403)
@@ -338,11 +342,11 @@ def update(short_name):
                 app = App.query.filter_by(short_name=short_name).first_or_404()
                 db.session.merge(new_application)
                 db.session.commit()
-                flash('Application updated!', 'success')
+                flash(lazy_gettext('Application updated!'), 'success')
                 return redirect(url_for('.details',
                                         short_name=new_application.short_name))
             else:
-                flash('Please correct the errors', 'error')
+                flash(lazy_gettext('Please correct the errors'), 'error')
                 return render_template('/applications/update.html',
                                        form=form,
                                        title=title,
@@ -412,8 +416,8 @@ def import_csv_tasks(app, csvreader):
         if not headers:
             headers = row
             if len(headers) != len(set(headers)):
-                raise BulkImportException('The file you uploaded has two headers with'
-                                         ' the same name.')
+                msg = lazy_gettext('The file you uploaded has two headers with the same name.')
+                raise BulkImportException(msg)
             field_headers = set(headers) & fields
             for field in field_headers:
                 field_header_index.append(headers.index(field))
@@ -430,7 +434,7 @@ def import_csv_tasks(app, csvreader):
             db.session.commit()
             empty = False
     if empty:
-        raise BulkImportException('Oops! It looks like the file is empty.')
+        raise BulkImportException(lazy_gettext('Oops! It looks like the file is empty.'))
 
 
 def import_epicollect_tasks(app, data):
@@ -440,117 +444,129 @@ def import_epicollect_tasks(app, data):
         db.session.add(task)
     db.session.commit()
 
+googledocs_urls = {
+    'image': "https://docs.google.com/spreadsheet/ccc"
+             "?key=0AsNlt0WgPAHwdHFEN29mZUF0czJWMUhIejF6dWZXdkE"
+             "&usp=sharing",
+    'sound': "https://docs.google.com/spreadsheet/ccc"
+             "?key=0AsNlt0WgPAHwdEczcWduOXRUb1JUc1VGMmJtc2xXaXc"
+             "&usp=sharing",
+    'map': "https://docs.google.com/spreadsheet/ccc"
+           "?key=0AsNlt0WgPAHwdGZnbjdwcnhKRVNlN1dGXy0tTnNWWXc"
+           "&usp=sharing",
+    'pdf': "https://docs.google.com/spreadsheet/ccc"
+           "?key=0AsNlt0WgPAHwdEVVamc0R0hrcjlGdXRaUXlqRXlJMEE"
+           "&usp=sharing"}
+
+def get_data_url(**kwargs):
+    csvform = kwargs["csvform"]
+    gdform = kwargs["gdform"]
+    epiform = kwargs["epiform"]
+
+    if 'csv_url' in request.form and csvform.validate_on_submit():
+        return csvform.csv_url.data
+    elif 'googledocs_url' in request.form and gdform.validate_on_submit():
+        return ''.join([gdform.googledocs_url.data, '&output=csv'])
+    elif 'epicollect_project' in request.form and epiform.validate_on_submit():
+        return 'http://plus.epicollect.net/%s/%s.json' % \
+            (epiform.epicollect_project.data, epiform.epicollect_form.data)
+    else:
+        return None
+
+def get_csv_data_from_request(app, r):
+    if r.status_code == 403:
+        msg = "Oops! It looks like you don't have permission to access" \
+            " that file"
+        raise BulkImportException(lazy_gettext(msg), 'error')
+    if ((not 'text/plain' in r.headers['content-type']) and
+        (not 'text/csv' in r.headers['content-type'])):
+        msg = lazy_gettext("Oops! That file doesn't look like the right file.")
+        raise BulkImportException(msg, 'error')
+    
+    csvcontent = StringIO(r.text)
+    csvreader = unicode_csv_reader(csvcontent)
+    return import_csv_tasks(app, csvreader)
+
+def get_epicollect_data_from_request(app, r):
+    if r.status_code == 403:
+        msg = "Oops! It looks like you don't have permission to access" \
+            " the EpiCollect Plus project"
+        raise BulkImportException(lazy_gettext(msg), 'error')
+    if not 'application/json' in r.headers['content-type']:
+        msg = "Oops! That project and form do not look like the right one."
+        raise BulkImportException(lazy_gettext(msg), 'error')
+    return import_epicollect_tasks(app, json.loads(r.text))
 
 @blueprint.route('/<short_name>/import', methods=['GET', 'POST'])
 def import_task(short_name):
     app = App.query.filter_by(short_name=short_name).first_or_404()
     title = "Applications: %s &middot; Import Tasks" % app.name
 
-    dataurl = None
+    data_handlers = [
+        ('csv_url', get_csv_data_from_request),
+        ('googledocs_url', get_csv_data_from_request),
+        ('epicollect_project', get_epicollect_data_from_request)
+        ]
+
     csvform = BulkTaskCSVImportForm(request.form)
     gdform = BulkTaskGDImportForm(request.form)
     europeanaform = BulkTaskEuropeanaImportForm(request.form)
     epiform = BulkTaskEpiCollectPlusImportForm(request.form)
 
-    if app.tasks or (request.args.get('template') or request.method == 'POST'):
+    template_args = {
+        "title": title,
+        "app": app,
+        "csvform": csvform,
+        "europeanaform": europeanaform,
+        "epiform": epiform,
+        "gdform": gdform
+        }
 
-        googledocs_urls = {
-            'image': "https://docs.google.com/spreadsheet/ccc"
-                     "?key=0AsNlt0WgPAHwdHFEN29mZUF0czJWMUhIejF6dWZXdkE"
-                     "&usp=sharing",
-            'sound': "https://docs.google.com/spreadsheet/ccc"
-                     "?key=0AsNlt0WgPAHwdEczcWduOXRUb1JUc1VGMmJtc2xXaXc"
-                     "&usp=sharing",
-            'map': "https://docs.google.com/spreadsheet/ccc"
-                   "?key=0AsNlt0WgPAHwdGZnbjdwcnhKRVNlN1dGXy0tTnNWWXc"
-                   "&usp=sharing",
-            'pdf': "https://docs.google.com/spreadsheet/ccc"
-                   "?key=0AsNlt0WgPAHwdEVVamc0R0hrcjlGdXRaUXlqRXlJMEE"
-                   "&usp=sharing"}
-
-        template = request.args.get('template')
-
-        if template in googledocs_urls:
-            gdform.googledocs_url.data = googledocs_urls[template]
-
-        if 'csv_url' in request.form and csvform.validate_on_submit():
-            dataurl = csvform.csv_url.data
-        elif 'googledocs_url' in request.form and gdform.validate_on_submit():
-            dataurl = ''.join([gdform.googledocs_url.data, '&output=csv'])
-        elif 'europeana_search_term' in request.form and europeanaform.validate_on_submit():
-            def reader():
-                for photo in get_flickr_photos(
-                    europeanaform.europeana_api_key.data,
-                    europeanaform.europeana_search_term.data):
-                    yield photo
-
-            import_csv_tasks(app, reader())
-            flash('Tasks imported successfully!', 'success')
-            return redirect(url_for('.details', short_name=app.short_name))
-        elif 'epicollect_project' in request.form and epiform.validate_on_submit():
-            dataurl = 'http://plus.epicollect.net/%s/%s.json' % \
-                      (epiform.epicollect_project.data, epiform.epicollect_form.data)
-
-        if dataurl:
-            try:
-                r = requests.get(dataurl)
-
-                if 'csv_url' in request.form or 'googledocs_url' in request.form:
-                    if r.status_code == 403:
-                        msg = "Oops! It looks like you don't have permission to access" \
-                              " that file"
-                        raise BulkImportException(msg, 'error')
-                    if ((not 'text/plain' in r.headers['content-type']) and
-                       (not 'text/csv' in r.headers['content-type'])):
-                        msg = "Oops! That file doesn't look like the right file."
-                        raise BulkImportException(msg, 'error')
-
-                    csvcontent = StringIO(r.text)
-                    csvreader = unicode_csv_reader(csvcontent)
-                    import_csv_tasks(app, csvreader)
-
-                    # TODO: check for errors
-                elif 'epicollect_project' in request.form:
-                    if r.status_code == 403:
-                        msg = "Oops! It looks like you don't have permission to access" \
-                              " the EpiCollect Plus project"
-                        raise BulkImportException(msg, 'error')
-                    if not 'application/json' in r.headers['content-type']:
-                        msg = "Oops! That project and form do not look like the right one."
-                        raise BulkImportException(msg, 'error')
-                    import_epicollect_tasks(app, json.loads(r.text))
-                flash('Tasks imported successfully!', 'success')
-                return redirect(url_for('.settings', short_name=app.short_name))
-            except BulkImportException, err_msg:
-                flash(err_msg, 'error')
-            except Exception as inst:
-                print type(inst)
-                print inst.args
-                print inst
-                msg = 'Oops! Looks like there was an error with processing that file!'
-                flash(msg, 'error')
-
-        tmpl = '/applications/import.html'
-
-        if template == 'epicollect':
-            return render_template(tmpl, title=title, app=app, epiform=epiform)
-        elif (template == 'image' or template == 'map'
-              or template == 'pdf' or template == 'sound'):
-            return render_template(tmpl, title=title, app=app, gdform=gdform,
-                                   europeanaform=europeanaform)
-        else:
-            return render_template(tmpl, title=title, app=app,
-                                   csvform=csvform,
-                                   gdform=gdform,
-                                   europeanaform=europeanaform)
-    else:
+    template = request.args.get('template')
+    if not (app.tasks or template or request.method == 'POST'):
         return render_template('/applications/import_options.html',
-                               title=title,
-                               app=app,
-                               csvform=csvform,
-                               gdform=gdform,
-                               europeanaform=europeanaform)
+                               **template_args)
 
+    if template in googledocs_urls:
+        gdform.googledocs_url.data = googledocs_urls[template]
+    
+    if 'europeana_search_term' in request.form and europeanaform.validate_on_submit():
+        def reader():
+            for photo in get_flickr_photos(
+                europeanaform.europeana_api_key.data,
+                europeanaform.europeana_search_term.data):
+                yield photo
+
+        import_csv_tasks(app, reader())
+        flash('Tasks imported successfully!', 'success')
+        return redirect(url_for('.details', short_name=app.short_name))
+
+    return _import_task(app, template_args, data_handlers)
+
+def _import_task(app, template_args, data_handlers):
+    dataurl = get_data_url(**template_args)
+
+    def render_forms():
+        tmpl = '/applications/import.html'    
+        return render_template(tmpl, **template_args)
+
+    if not dataurl:
+        return render_forms()
+
+    try:
+        r = requests.get(dataurl)
+        for form_id, handler in data_handlers:
+            if form_id in request.form:
+                handler(app, r)
+                break
+        flash(lazy_gettext('Tasks imported successfully!'), 'success')
+        return redirect(url_for('.settings', short_name=app.short_name))
+    except BulkImportException, err_msg:
+        flash(err_msg, 'error')
+    except Exception as inst:
+        msg = 'Oops! Looks like there was an error with processing that file!'
+        flash(lazy_gettext(msg), 'error')
+    return render_forms()
 
 @blueprint.route('/<short_name>/task/<int:task_id>')
 def task_presenter(short_name, task_id):
@@ -560,12 +576,13 @@ def task_presenter(short_name, task_id):
     if not app.allow_anonymous_contributors and current_user.is_anonymous():
         msg = "Oops! You have to sign in to participate in <strong>%s</strong> \
                application" % app.name
-        flash(msg, 'warning')
+        flash(lazy_gettext(msg), 'warning')
         return redirect(url_for('account.signin',
                         next=url_for('.presenter', short_name=app.short_name)))
     if (current_user.is_anonymous()):
-        flash("Ooops! You are an anonymous user and will not get any credit "
-              " for your contributions. <a href=\"" + url_for('account.signin',
+        msg_1 = lazy_gettext("Ooops! You are an anonymous user and will not get any credit "
+                             " for your contributions.")
+        flash(msg_1 + "<a href=\"" + url_for('account.signin',
               next=url_for('app.task_presenter', short_name=short_name,
                            task_id=task_id))
               + "\">Sign in now!</a>", "warning")
@@ -614,19 +631,17 @@ def presenter(short_name):
     if not app.allow_anonymous_contributors and current_user.is_anonymous():
         msg = "Oops! You have to sign in to participate in <strong>%s</strong> \
                application" % app.name
-        flash(msg, 'warning')
+        flash(lazy_gettext(msg), 'warning')
         return redirect(url_for('account.signin',
                         next=url_for('.presenter', short_name=app.short_name)))
 
     if app.info.get("tutorial"):
         if request.cookies.get(app.short_name + "tutorial") is None:
             if (current_user.is_anonymous()):
-                flash("Ooops! You are an anonymous user and will not get any"
-                      " credit for your contributions. <a href=\"" +
-                      url_for('account.signin',
-                              next=url_for('app.tutorial',
-                                           short_name=short_name))
-                      + "\">Sign in now!</a>", "warning")
+                msg_1 = lazy_gettext("Ooops! You are an anonymous user and will not \
+                                     get any credit for your contributions. Sign in \
+                                     now!")
+                flash(msg_1, "warning")
             resp = make_response(render_template('/applications/tutorial.html',
                                                  title=title,
                                                  app=app))
@@ -634,24 +649,20 @@ def presenter(short_name):
             return resp
         else:
             if (current_user.is_anonymous()):
-                flash("Ooops! You are an anonymous user and will not get any"
-                      "credit for your contributions. <a href=\"" +
-                      url_for('account.signin',
-                              next=url_for('app.presenter',
-                                           short_name=short_name))
-                      + "\">Sign in now!</a>", "warning")
+                msg_1 = lazy_gettext("Ooops! You are an anonymous user and will not \
+                                     get any credit for your contributions. Sign in \
+                                     now!")
+                flash(msg_1, "warning")
             return render_template('/applications/presenter.html',
                                    title=title,
                                    app=app)
     else:
         if (current_user.is_anonymous()):
-            flash("Ooops! You are an anonymous user and will not get any"
-                  "credit for your contributions. <a href=\"" +
-                  url_for('account.signin',
-                          next=url_for('app.presenter',
-                                       short_name=short_name))
-                  + "\">Sign in now!</a>", "warning")
-
+            if (current_user.is_anonymous()):
+                msg_1 = lazy_gettext("Ooops! You are an anonymous user and will not \
+                                     get any credit for your contributions. Sign in \
+                                     now!")
+                flash(msg_1, "warning")
         return render_template('/applications/presenter.html',
                                title=title,
                                app=app)
@@ -763,7 +774,7 @@ def delete_tasks(short_name):
                 db.session.delete(task)
             db.session.commit()
             msg = "All the tasks and associated task runs have been deleted"
-            flash(msg, 'success')
+            flash(lazy_gettext(msg), 'success')
             return redirect(url_for('.settings', short_name=app.short_name))
     except HTTPException:
         return abort(403)
@@ -825,13 +836,13 @@ def export_to(short_name):
                 "task": (
                     model.Task, handle_task,
                     (lambda x: True),
-                    "Oops, the application does not have tasks to \
-                           export, if you are the owner add some tasks"),
+                    lazy_gettext("Oops, the application does not have tasks to \
+                           export, if you are the owner add some tasks")),
                 "task_run": (
                     model.TaskRun, handle_task_run,
                     (lambda x: type(x.info) == dict),
-                    "Oops, there are no Task Runs yet to export, invite \
-                           some users to participate")
+                    lazy_gettext("Oops, there are no Task Runs yet to export, invite \
+                           some users to participate"))
                 }
             try:
                 table, handle_row, test, msg = types[ty]
@@ -847,7 +858,7 @@ def export_to(short_name):
                 if test(t):
                     writer.writerow(t.info.keys())
 
-                return Response(get_csv(out, writer, table, handle_row), 
+                return Response(get_csv(out, writer, table, handle_row),
                                 mimetype='text/csv')
             else:
                 flash(msg, 'info')
