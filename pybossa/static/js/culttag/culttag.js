@@ -2,6 +2,10 @@
 
   function getTags(task) {
 	// return task.info.tag_names
+	return [ [ { "label": "Yes", "value": "yes" },
+			   { "label": "No", "value": "no" },
+			   { "label": "Skip", "value": "skipped" } ] ];
+
 	return [ [ { "label": "Person", "value": "yes6" },
 			   { "label": "Royal", "value": "yes5" },
 			   { "label": "Animal", "value": "yes4" } ],
@@ -21,10 +25,16 @@
     });
   };
 
+  var doneOnce = false;
+
   function addTagButtons(task) {
+	if (doneOnce) {
+	  return;
+	}
+	doneOnce = true;
 	var rows = getTags(task);
 	var buttons_div = $("div#answer");
-	buttons_div.empty();
+	//buttons_div.empty();
 	for(var row = 0; row < rows.length; row++) {
 	  var new_row = $('<div class="row">');
 	  for(var col = 0; col < rows[row].length; col++) {
@@ -80,6 +90,10 @@
         $('#photo-link').html('').append(task.info.image);
         $("#photo-link").attr("href", task.info.link);
         $("#question").html(task.info.question);
+	  $("#imgTitle").html(task.info.title);
+	  $("#imgCreator").html(task.info.creator);
+//	  $("#imgYear").html(task.info.date);
+	  
         $('#task-id').html(task.id);
         addTagButtons(task);
         $('.btn-answer').off('click').on('click', answered_cb);
