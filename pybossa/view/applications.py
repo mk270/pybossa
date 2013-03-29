@@ -151,44 +151,52 @@ def draft(page):
 @blueprint.route('/new', methods=['GET', 'POST'])
 @login_required
 def new():
-    errors = False
-    if require.app.create():
-        form = AppForm(request.form)
-        if request.method == 'POST' and form.validate():
-            info = {}
-            # Add the info items
-            if form.thumbnail.data:
-                info['thumbnail'] = form.thumbnail.data
-            if form.sched.data:
-                info['sched'] = form.sched.data
-
-            app = model.App(name=form.name.data,
-                            short_name=form.short_name.data,
-                            description=form.description.data,
-                            long_description=form.long_description.data,
-                            hidden=int(form.hidden.data),
-                            owner_id=current_user.id,
-                            info=info,)
-
-            cached_apps.reset()
-            db.session.add(app)
-            db.session.commit()
-            # Clean cache
-            msg_1 = lazy_gettext('Application created!')
-            flash('<i class="icon-ok"></i> ' + msg_1, 'success')
-            flash('<i class="icon-bullhorn"></i> ' + lazy_gettext('You can check the ') +
-                  '<strong><a href="https://docs.pybossa.com">' + lazy_gettext('Guide and '
-                  ' Documentation') + '</a></strong> ' + lazy_gettext('for adding tasks, '
-                  ' a thumbnail, using PyBossa.JS, etc.'), 'info')
-            return redirect(url_for('.settings', short_name=app.short_name))
-        if request.method == 'POST' and not form.validate():
-            flash(lazy_gettext('Please correct the errors'), 'error')
-            errors = True
-        return render_template('applications/new.html',
-                               title=lazy_gettext("Create an Application"),
-                               form=form, errors=errors)
-    else:
+    if not require.app.create():
         abort(403)
+    form = AppForm(request.form)
+
+    def respond(errors):
+        return render_template('applications/new.html',
+                        title=lazy_gettext("Create an Application"),
+                        form=form, errors=errors)
+
+    if request.method != 'POST':
+        return respond(False)
+
+    if not form.validate():
+        flash(lazy_gettext('Please correct the errors'), 'error')
+        return respond(True)
+
+    info = {}
+    # Add the info items
+    if form.thumbnail.data:
+        info['thumbnail'] = form.thumbnail.data
+    if form.sched.data:
+        info['sched'] = form.sched.data
+
+    app = model.App(name=form.name.data,
+                    short_name=form.short_name.data,
+                    description=form.description.data,
+                    long_description=form.long_description.data,
+                    hidden=int(form.hidden.data),
+                    owner_id=current_user.id,
+                    info=info,)
+
+    cached_apps.reset()
+    db.session.add(app)
+    db.session.commit()
+    # Clean cache
+    msg_1 = lazy_gettext('Application created!')
+    flash('<i class="icon-ok"></i> ' + msg_1, 'success')
+    flash('<i class="icon-bullhorn"></i> ' + 
+          lazy_gettext('You can check the ') +
+          '<strong><a href="https://docs.pybossa.com">' + 
+          lazy_gettext('Guide and Documentation') + 
+          '</a></strong> ' + 
+          lazy_gettext(
+            'for adding tasks, a thumbnail, using PyBossa.JS, etc.'), 
+          'info')
+    return redirect(url_for('.settings', short_name=app.short_name))
 
 
 @blueprint.route('/<short_name>/taskpresentereditor', methods=['GET', 'POST'])
@@ -223,16 +231,7 @@ def task_presenter_editor(short_name):
     if app.info.get('task_presenter'):
         form.editor.data = app.info['task_presenter']
     else:
-        if request.args.get('template'):
-            tmpl_uri = "applications/snippets/%s.html" \
-                % request.args.get('template')
-            tmpl = render_template(tmpl_uri, app=app)
-            form.editor.data = tmpl
-            msg = 'Your code will be <em>automagically</em> rendered in \
-                      the <strong>preview section</strong>. Click in the \
-                      preview button!'
-            flash(lazy_gettext(msg), 'info')
-        else:
+        if not request.args.get('template'):
             msg = '<strong>Note</strong> You will need to upload ' \
                 'the tasks using the <a href="%s">' \
                 'CSV importer</a> or download the app ' \
@@ -245,6 +244,15 @@ def task_presenter_editor(short_name):
                 'applications/task_presenter_options.html',
                 title=title,
                 app=app)
+
+        tmpl_uri = "applications/snippets/%s.html" \
+            % request.args.get('template')
+        tmpl = render_template(tmpl_uri, app=app)
+        form.editor.data = tmpl
+        msg = 'Your code will be <em>automagically</em> rendered in \
+                      the <strong>preview section</strong>. Click in the \
+                      preview button!'
+        flash(lazy_gettext(msg), 'info')
     return render_template('applications/task_presenter_editor.html',
                            title=title,
                            form=form,
@@ -342,26 +350,20 @@ def details(short_name):
     app = db.session.query(model.App)\
                     .filter(model.App.short_name == short_name)\
                     .first()
-    if app:
-        title = "Application: %s" % app.name
-        try:
-            require.app.read(app)
-            require.app.update(app)
-
-            return render_template('/applications/actions.html',
-                                   app=app,
-                                   title=title)
-        except HTTPException:
-            if not app.hidden:
-                return render_template('/applications/app.html',
-                                       app=app,
-                                       title=title)
-            else:
-                return render_template('/applications/app.html',
-                                       title="Application not found",
-                                       app=None)
-    else:
+    if not app:
         abort(404)
+    title = "Application: %s" % app.name
+
+    template_args = {"app": app, "title": title}
+    try:
+        require.app.read(app)
+        require.app.update(app)
+
+        return render_template('/applications/actions.html', **template_args)
+    except HTTPException:
+        if app.hidden:
+            template_args = {"app": None, "title": "Application not found"}
+        return render_template('/applications/app.html', **template_args)
 
 
 @blueprint.route('/<short_name>/settings')
@@ -371,19 +373,19 @@ def settings(short_name):
                     .filter(model.App.short_name == short_name)\
                     .first()
 
-    if application:
-        title = "Application: %s &middot; Settings" % application.name
-        try:
-            require.app.read(application)
-            require.app.update(application)
-
-            return render_template('/applications/settings.html',
-                                   app=application,
-                                   title=title)
-        except HTTPException:
-            return abort(403)
-    else:
+    if not application:
         abort(404)
+        
+    title = "Application: %s &middot; Settings" % application.name
+    try:
+        require.app.read(application)
+        require.app.update(application)
+
+        return render_template('/applications/settings.html',
+                               app=application,
+                               title=title)
+    except HTTPException:
+        return abort(403)
 
 
 def import_csv_tasks(app, csvreader):
@@ -658,15 +660,14 @@ def export(short_name, task_id):
             .filter(model.App.short_name == short_name)\
             .first()
 
-    if app:
-        task = db.session.query(model.Task)\
-                 .filter(model.Task.id == task_id)\
-                 .first()
-
-        results = [tr.dictize() for tr in task.task_runs]
-        return Response(json.dumps(results), mimetype='application/json')
-    else:
+    if not app:
         return abort(404)
+    task = db.session.query(model.Task)\
+        .filter(model.Task.id == task_id)\
+        .first()
+
+    results = [tr.dictize() for tr in task.task_runs]
+    return Response(json.dumps(results), mimetype='application/json')
 
 
 @blueprint.route('/<short_name>/tasks', defaults={'page': 1})
@@ -677,20 +678,18 @@ def tasks(short_name, page):
         title = "Application: %s &middot; Tasks" % app.name
     else:
         title = "Application not found"
-    try:
-        require.app.read(app)
-        require.app.update(app)
 
+    def respond():
         per_page = 10
         count = db.session.query(model.Task)\
-                  .filter_by(app_id=app.id)\
-                  .count()
+            .filter_by(app_id=app.id)\
+            .count()
         app_tasks = db.session.query(model.Task)\
-                      .filter_by(app_id=app.id)\
-                      .order_by(model.Task.id)\
-                      .limit(per_page)\
-                      .offset((page - 1) * per_page)\
-                      .all()
+            .filter_by(app_id=app.id)\
+            .order_by(model.Task.id)\
+            .limit(per_page)\
+            .offset((page - 1) * per_page)\
+            .all()
 
         if not app_tasks and page != 1:
             abort(404)
@@ -701,32 +700,17 @@ def tasks(short_name, page):
                                tasks=app_tasks,
                                title=title,
                                pagination=pagination)
+
+    try:
+        require.app.read(app)
+        require.app.update(app)
+        return respond()
     except HTTPException:
         if not app.hidden:
-            per_page = 10
-            count = db.session.query(model.Task)\
-                      .filter_by(app_id=app.id)\
-                      .count()
-            app_tasks = db.session.query(model.Task)\
-                          .filter_by(app_id=app.id)\
-                          .order_by(model.Task.id)\
-                          .limit(per_page)\
-                          .offset((page - 1) * per_page)\
-                          .all()
-
-            if not app_tasks and page != 1:
-                abort(404)
-
-            pagination = Pagination(page, per_page, count)
-            return render_template('/applications/tasks.html',
-                                   app=app,
-                                   tasks=app_tasks,
-                                   title=title,
-                                   pagination=pagination)
-        else:
-            return render_template('/applications/tasks.html',
-                                   title="Application not found",
-                                   app=None)
+            return respond()
+        return render_template('/applications/tasks.html',
+                               title="Application not found",
+                               app=None)
 
 
 @blueprint.route('/<short_name>/tasks/delete', methods=['GET', 'POST'])
@@ -791,59 +775,63 @@ def export_to(short_name):
             handle_row(writer, tr)
         yield out.getvalue()
 
+    def respond_json(ty):
+        tables = {"task": model.Task, "task_run": model.TaskRun}
+        try:
+            table = tables[ty]
+        except KeyError:
+            return abort(404)
+        return Response(gen_json(table), mimetype='application/json')
+
+    def respond_csv(ty):
+        # Export Task(/Runs) to CSV
+        types = {
+            "task": (
+                model.Task, handle_task,
+                (lambda x: True),
+                lazy_gettext(
+                    "Oops, the application does not have tasks to \
+                           export, if you are the owner add some tasks")),
+            "task_run": (
+                model.TaskRun, handle_task_run,
+                (lambda x: type(x.info) == dict),
+                lazy_gettext(
+                    "Oops, there are no Task Runs yet to export, invite \
+                           some users to participate"))
+            }
+        try:
+            table, handle_row, test, msg = types[ty]
+        except KeyError:
+            return abort(404)
+
+        out = StringIO()
+        writer = UnicodeWriter(out)
+        t = db.session.query(table)\
+            .filter_by(app_id=app.id)\
+            .first()
+        if t is not None:
+            if test(t):
+                writer.writerow(t.info.keys())
+
+            return Response(get_csv(out, writer, table, handle_row),
+                                mimetype='text/csv')
+        else:
+            flash(msg, 'info')
+            return render_template('/applications/export.html',
+                                   title=title,
+                                   app=app)
+
     ty = request.args.get('type')
     fmt = request.args.get('format')
-    if fmt and ty:
-        if fmt not in ["json", "csv"]:
+    if not (fmt and ty):
+        if len(request.args) >= 1:
             abort(404)
-        if fmt == 'json':
-            tables = {"task": model.Task, "task_run": model.TaskRun}
-            try:
-                table = tables[ty]
-            except KeyError:
-                return abort(404)
-            return Response(gen_json(table), mimetype='application/json')
-        elif fmt == 'csv':
-            # Export Task(/Runs) to CSV
-            types = {
-                "task": (
-                    model.Task, handle_task,
-                    (lambda x: True),
-                    lazy_gettext("Oops, the application does not have tasks to \
-                           export, if you are the owner add some tasks")),
-                "task_run": (
-                    model.TaskRun, handle_task_run,
-                    (lambda x: type(x.info) == dict),
-                    lazy_gettext("Oops, there are no Task Runs yet to export, invite \
-                           some users to participate"))
-                }
-            try:
-                table, handle_row, test, msg = types[ty]
-            except KeyError:
-                return abort(404)
-
-            out = StringIO()
-            writer = UnicodeWriter(out)
-            t = db.session.query(table)\
-                .filter_by(app_id=app.id)\
-                .first()
-            if t is not None:
-                if test(t):
-                    writer.writerow(t.info.keys())
-
-                return Response(get_csv(out, writer, table, handle_row),
-                                mimetype='text/csv')
-            else:
-                flash(msg, 'info')
-                return render_template('/applications/export.html',
-                                       title=title,
-                                       app=app)
-    elif len(request.args) >= 1:
-        abort(404)
-    else:
         return render_template('/applications/export.html',
                                title=title,
                                app=app)
+    if fmt not in ["json", "csv"]:
+        abort(404)
+    return {"json": respond_json, "csv": respond_csv}[fmt](ty)
 
 
 @blueprint.route('/<short_name>/stats')
