@@ -104,104 +104,99 @@ class BulkTaskEpiCollectPlusImportForm(Form):
 @blueprint.route('/page/<int:page>')
 def index(page):
     """By default show the Featured apps"""
-    if require.app.read():
-        per_page = 5
+    return app_index(page, cached_apps.get_featured, 'app-featured',
+                     True, False)
 
-        apps, count = cached_apps.get_featured(page, per_page)
 
-        if apps:
-            pagination = Pagination(page, per_page, count)
-            return render_template('/applications/index.html',
-                                   title=lazy_gettext("Applications"),
-                                   apps=apps,
-                                   pagination=pagination,
-                                   app_type='app-featured')
-        else:
-            return redirect(url_for('.published'))
-    else:
+def app_index(page, lookup, app_type, fallback, use_count):
+    """Show apps of app_type"""
+    if not require.app.read():
         abort(403)
+
+    per_page = 5
+
+    apps, count = lookup(page, per_page)
+
+    if fallback and not apps:
+        return redirect(url_for('.published'))
+
+    pagination = Pagination(page, per_page, count)
+    template_args = {
+        "apps": apps,
+        "title": lazy_gettext("Applications"),
+        "pagination": pagination,
+        "app_type": app_type
+        }
+    if use_count:
+        template_args.update({"count": count})
+    return render_template('/applications/index.html', **template_args)
 
 
 @blueprint.route('/published', defaults={'page': 1})
 @blueprint.route('/published/page/<int:page>')
 def published(page):
     """Show the Published apps"""
-    if require.app.read():
-        per_page = 5
-
-        apps, count = cached_apps.get_published(page, per_page)
-
-        pagination = Pagination(page, per_page, count)
-        return render_template('/applications/index.html',
-                               title=lazy_gettext("Applications"),
-                               apps=apps,
-                               count=count,
-                               pagination=pagination,
-                               app_type='app-published')
-    else:
-        abort(403)
+    return app_index(page, cached_apps.get_published, 'app-published', 
+                     False, True)
 
 
 @blueprint.route('/draft', defaults={'page': 1})
 @blueprint.route('/draft/page/<int:page>')
 def draft(page):
-    if require.app.read():
-        per_page = 5
-
-        apps, count = cached_apps.get_draft(page, per_page)
-
-        pagination = Pagination(page, per_page, count)
-        return render_template('/applications/index.html',
-                               title=lazy_gettext("Applications"),
-                               apps=apps,
-                               count=count,
-                               pagination=pagination,
-                               app_type='app-draft')
-    else:
-        abort(403)
+    """Show the Draft apps"""
+    return app_index(page, cached_apps.get_draft, 'app-draft', 
+                     False, True)
 
 
 @blueprint.route('/new', methods=['GET', 'POST'])
 @login_required
 def new():
-    errors = False
-    if require.app.create():
-        form = AppForm(request.form)
-        if request.method == 'POST' and form.validate():
-            info = {}
-            # Add the info items
-            if form.thumbnail.data:
-                info['thumbnail'] = form.thumbnail.data
-            if form.sched.data:
-                info['sched'] = form.sched.data
-
-            app = model.App(name=form.name.data,
-                            short_name=form.short_name.data,
-                            description=form.description.data,
-                            long_description=form.long_description.data,
-                            hidden=int(form.hidden.data),
-                            owner_id=current_user.id,
-                            info=info,)
-
-            cached_apps.reset()
-            db.session.add(app)
-            db.session.commit()
-            # Clean cache
-            msg_1 = lazy_gettext('Application created!')
-            flash('<i class="icon-ok"></i> ' + msg_1, 'success')
-            flash('<i class="icon-bullhorn"></i> ' + lazy_gettext('You can check the ') +
-                  '<strong><a href="https://docs.pybossa.com">' + lazy_gettext('Guide and '
-                  ' Documentation') + '</a></strong> ' + lazy_gettext('for adding tasks, '
-                  ' a thumbnail, using PyBossa.JS, etc.'), 'info')
-            return redirect(url_for('.settings', short_name=app.short_name))
-        if request.method == 'POST' and not form.validate():
-            flash(lazy_gettext('Please correct the errors'), 'error')
-            errors = True
-        return render_template('applications/new.html',
-                               title=lazy_gettext("Create an Application"),
-                               form=form, errors=errors)
-    else:
+    if not require.app.create():
         abort(403)
+    form = AppForm(request.form)
+
+    def respond(errors):
+        return render_template('applications/new.html',
+                        title=lazy_gettext("Create an Application"),
+                        form=form, errors=errors)
+
+    if request.method != 'POST':
+        return respond(False)
+
+    if not form.validate():
+        flash(lazy_gettext('Please correct the errors'), 'error')
+        return respond(True)
+
+    info = {}
+    # Add the info items
+    if form.thumbnail.data:
+        info['thumbnail'] = form.thumbnail.data
+    if form.sched.data:
+        info['sched'] = form.sched.data
+
+    app = model.App(name=form.name.data,
+                    short_name=form.short_name.data,
+                    description=form.description.data,
+                    long_description=form.long_description.data,
+                    hidden=int(form.hidden.data),
+                    owner_id=current_user.id,
+                    info=info,)
+
+    cached_apps.reset()
+    db.session.add(app)
+    db.session.commit()
+    # Clean cache
+    msg_1 = lazy_gettext('Application created!')
+    flash('<i class="icon-ok"></i> ' + msg_1, 'success')
+    flash('<i class="icon-bullhorn"></i> ' + 
+          lazy_gettext('You can check the ') +
+          '<strong><a href="https://docs.pybossa.com">' + 
+          lazy_gettext('Guide and Documentation') + 
+          '</a></strong> ' + 
+          lazy_gettext(
+            'for adding tasks, a thumbnail, using PyBossa.JS, etc.'), 
+          'info')
+    return redirect(url_for('.settings', short_name=app.short_name))
 
 
 @blueprint.route('/<short_name>/taskpresentereditor', methods=['GET', 'POST'])
@@ -236,16 +231,7 @@ def task_presenter_editor(short_name):
     if app.info.get('task_presenter'):
         form.editor.data = app.info['task_presenter']
     else:
-        if request.args.get('template'):
-            tmpl_uri = "applications/snippets/%s.html" \
-                % request.args.get('template')
-            tmpl = render_template(tmpl_uri, app=app)
-            form.editor.data = tmpl
-            msg = 'Your code will be <em>automagically</em> rendered in \
-                      the <strong>preview section</strong>. Click in the \
-                      preview button!'
-            flash(lazy_gettext(msg), 'info')
-        else:
+        if not request.args.get('template'):
             msg = '<strong>Note</strong> You will need to upload ' \
                 'the tasks using the <a href="%s">' \
                 'CSV importer</a> or download the app ' \
@@ -258,6 +244,15 @@ def task_presenter_editor(short_name):
                 'applications/task_presenter_options.html',
                 title=title,
                 app=app)
+
+        tmpl_uri = "applications/snippets/%s.html" \
+            % request.args.get('template')
+        tmpl = render_template(tmpl_uri, app=app)
+        form.editor.data = tmpl
+        msg = 'Your code will be <em>automagically</em> rendered in \
+                      the <strong>preview section</strong>. Click in the \
+                      preview button!'
+        flash(lazy_gettext(msg), 'info')
     return render_template('applications/task_presenter_editor.html',
                            title=title,
                            form=form,
@@ -269,90 +264,85 @@ def task_presenter_editor(short_name):
 @login_required
 def delete(short_name):
     app = App.query.filter_by(short_name=short_name).first()
-    if app:
-        title = "Application: %s &middot; Delete" % app.name
-        if require.app.delete(app):
-            if request.method == 'GET':
-                return render_template('/applications/delete.html',
-                                       title=title,
-                                       app=app)
-            else:
-                # Clean cache
-                cached_apps.clean(app.id)
-                db.session.delete(app)
-                db.session.commit()
-                flash(lazy_gettext('Application deleted!'), 'success')
-                return redirect(url_for('account.profile'))
-        else:
-            abort(403)
-    else:
+    if not app:
         abort(404)
 
+    title = "Application: %s &middot; Delete" % app.name
+    if not require.app.delete(app):
+        abort(403)
+    if request.method == 'GET':
+        return render_template('/applications/delete.html',
+                                   title=title,
+                                   app=app)
+    # Clean cache
+    cached_apps.clean(app.id)
+    db.session.delete(app)
+    db.session.commit()
+    flash(lazy_gettext('Application deleted!'), 'success')
+    return redirect(url_for('account.profile'))
 
 @blueprint.route('/<short_name>/update', methods=['GET', 'POST'])
 @login_required
 def update(short_name):
     app = App.query.filter_by(short_name=short_name).first_or_404()
-    if require.app.update(app):
-        title = "Application: %s &middot; Update" % app.name
-        if request.method == 'GET':
-            form = AppForm(obj=app)
-            form.populate_obj(app)
-            if app.info.get('thumbnail'):
-                form.thumbnail.data = app.info['thumbnail']
-            if app.info.get('sched'):
-                for s in form.sched.choices:
-                    if app.info['sched'] == s[0]:
-                        form.sched.data = s[0]
-                        break
 
-            return render_template('/applications/update.html',
-                                   title=title,
-                                   form=form,
-                                   app=app)
+    def handle_valid_form(form):
+        hidden = int(form.hidden.data)
 
-        if request.method == 'POST':
-            form = AppForm(request.form)
-            if form.validate():
-                if form.hidden.data:
-                    hidden = 1
-                else:
-                    hidden = 0
+        new_info = {}
+        # Add the info items
+        app = App.query.filter_by(short_name=short_name).first_or_404()
+        if form.thumbnail.data:
+            new_info['thumbnail'] = form.thumbnail.data
+        if form.sched.data:
+            new_info['sched'] = form.sched.data
 
-                new_info = {}
-                # Add the info items
-                app = App.query.filter_by(short_name=short_name).first_or_404()
-                if form.thumbnail.data:
-                    new_info['thumbnail'] = form.thumbnail.data
-                if form.sched.data:
-                    new_info['sched'] = form.sched.data
+        # Merge info object
+        info = dict(app.info.items() + new_info.items())
 
-                # Merge info object
-                info = dict(app.info.items() + new_info.items())
+        new_application = model.App(
+            id=form.id.data,
+            name=form.name.data,
+            short_name=form.short_name.data,
+            description=form.description.data,
+            long_description=form.long_description.data,
+            hidden=hidden,
+            info=info,
+            owner_id=app.owner_id,
+            allow_anonymous_contributors=form.allow_anonymous_contributors.data
+            )
+        app = App.query.filter_by(short_name=short_name).first_or_404()
+        db.session.merge(new_application)
+        db.session.commit()
+        flash(lazy_gettext('Application updated!'), 'success')
+        return redirect(url_for('.details',
+                                short_name=new_application.short_name))
 
-                new_application = model.App(id=form.id.data,
-                                            name=form.name.data,
-                                            short_name=form.short_name.data,
-                                            description=form.description.data,
-                                            long_description=form.long_description.data,
-                                            hidden=hidden,
-                                            info=info,
-                                            owner_id=app.owner_id,
-                                            allow_anonymous_contributors=form.allow_anonymous_contributors.data)
-                app = App.query.filter_by(short_name=short_name).first_or_404()
-                db.session.merge(new_application)
-                db.session.commit()
-                flash(lazy_gettext('Application updated!'), 'success')
-                return redirect(url_for('.details',
-                                        short_name=new_application.short_name))
-            else:
-                flash(lazy_gettext('Please correct the errors'), 'error')
-                return render_template('/applications/update.html',
-                                       form=form,
-                                       title=title,
-                                       app=app)
-    else:
+    if not require.app.update(app):
         abort(403)
+
+    title = "Application: %s &middot; Update" % app.name
+    if request.method == 'GET':
+        form = AppForm(obj=app)
+        form.populate_obj(app)
+        if app.info.get('thumbnail'):
+            form.thumbnail.data = app.info['thumbnail']
+        if app.info.get('sched'):
+            for s in form.sched.choices:
+                if app.info['sched'] == s[0]:
+                    form.sched.data = s[0]
+                    break
+
+    if request.method == 'POST':
+        form = AppForm(request.form)
+        if form.validate():
+            return handle_valid_form(form)
+        flash(lazy_gettext('Please correct the errors'), 'error')
+
+    return render_template('/applications/update.html',
+                           form=form,
+                           title=title,
+                           app=app)
 
 
 @blueprint.route('/<short_name>/')
@@ -360,26 +350,20 @@ def details(short_name):
     app = db.session.query(model.App)\
                     .filter(model.App.short_name == short_name)\
                     .first()
-    if app:
-        title = "Application: %s" % app.name
-        try:
-            require.app.read(app)
-            require.app.update(app)
-
-            return render_template('/applications/actions.html',
-                                   app=app,
-                                   title=title)
-        except HTTPException:
-            if not app.hidden:
-                return render_template('/applications/app.html',
-                                       app=app,
-                                       title=title)
-            else:
-                return render_template('/applications/app.html',
-                                       title="Application not found",
-                                       app=None)
-    else:
+    if not app:
         abort(404)
+    title = "Application: %s" % app.name
+
+    template_args = {"app": app, "title": title}
+    try:
+        require.app.read(app)
+        require.app.update(app)
+
+        return render_template('/applications/actions.html', **template_args)
+    except HTTPException:
+        if app.hidden:
+            template_args = {"app": None, "title": "Application not found"}
+        return render_template('/applications/app.html', **template_args)
 
 
 @blueprint.route('/<short_name>/settings')
@@ -389,19 +373,19 @@ def settings(short_name):
                     .filter(model.App.short_name == short_name)\
                     .first()
 
-    if application:
-        title = "Application: %s &middot; Settings" % application.name
-        try:
-            require.app.read(application)
-            require.app.update(application)
-
-            return render_template('/applications/settings.html',
-                                   app=application,
-                                   title=title)
-        except HTTPException:
-            return abort(403)
-    else:
+    if not application:
         abort(404)
+        
+    title = "Application: %s &middot; Settings" % application.name
+    try:
+        require.app.read(application)
+        require.app.update(application)
+
+        return render_template('/applications/settings.html',
+                               app=application,
+                               title=title)
+    except HTTPException:
+        return abort(403)
 
 
 def import_csv_tasks(app, csvreader):
@@ -501,35 +485,34 @@ def get_epicollect_data_from_request(app, r):
 def import_task(short_name):
     app = App.query.filter_by(short_name=short_name).first_or_404()
     title = "Applications: %s &middot; Import Tasks" % app.name
+    template_args = {"title": title, "app": app}
 
-    data_handlers = [
-        ('csv_url', get_csv_data_from_request),
-        ('googledocs_url', get_csv_data_from_request),
-        ('epicollect_project', get_epicollect_data_from_request)
-        ]
+    importer_forms = [
+        ('csv_url', get_csv_data_from_request,
+         'csvform', BulkTaskCSVImportForm),
+        ('googledocs_url', get_csv_data_from_request,
+         'gdform', BulkTaskGDImportForm),
+        ('epicollect_project', get_epicollect_data_from_request,
+         'epiform', BulkTaskEpiCollectPlusImportForm),
+        ('europeana_search_term', (lambda : None),
+         'europeanaform', BulkTaskEuropeanaImportForm)
+        ]        
 
-    csvform = BulkTaskCSVImportForm(request.form)
-    gdform = BulkTaskGDImportForm(request.form)
-    europeanaform = BulkTaskEuropeanaImportForm(request.form)
-    epiform = BulkTaskEpiCollectPlusImportForm(request.form)
+    data_handlers = [(name, handler) for name, handler, _, _ in importer_forms]
 
-    template_args = {
-        "title": title,
-        "app": app,
-        "csvform": csvform,
-        "europeanaform": europeanaform,
-        "epiform": epiform,
-        "gdform": gdform
-        }
-
+    forms = [(form_name, cls(request.form)) 
+             for _, _, form_name, cls in importer_forms]
+    template_args.update(dict(forms))
+    
     template = request.args.get('template')
     if not (app.tasks or template or request.method == 'POST'):
         return render_template('/applications/import_options.html',
                                **template_args)
 
     if template in googledocs_urls:
-        gdform.googledocs_url.data = googledocs_urls[template]
+        template_args["gdform"].googledocs_url.data = googledocs_urls[template]
     
+    europeanaform = template_args["europeanaform"]
     if 'europeana_search_term' in request.form and europeanaform.validate_on_submit():
         def reader():
             for photo in get_flickr_photos(
@@ -573,54 +556,59 @@ def task_presenter(short_name, task_id):
     app = App.query.filter_by(short_name=short_name).first_or_404()
     task = Task.query.filter_by(id=task_id).first_or_404()
 
-    if not app.allow_anonymous_contributors and current_user.is_anonymous():
-        msg = "Oops! You have to sign in to participate in <strong>%s</strong> \
-               application" % app.name
-        flash(lazy_gettext(msg), 'warning')
-        return redirect(url_for('account.signin',
-                        next=url_for('.presenter', short_name=app.short_name)))
-    if (current_user.is_anonymous()):
-        msg_1 = lazy_gettext("Ooops! You are an anonymous user and will not get any credit "
-                             " for your contributions.")
-        flash(msg_1 + "<a href=\"" + url_for('account.signin',
-              next=url_for('app.task_presenter', short_name=short_name,
-                           task_id=task_id))
-              + "\">Sign in now!</a>", "warning")
+    if current_user.is_anonymous():
+        if not app.allow_anonymous_contributors:
+            msg = ("Oops! You have to sign in to participate in "
+                   "<strong>%s</strong>"
+                   "application" % app.name)
+            flash(lazy_gettext(msg), 'warning')
+            return redirect(url_for(
+                    'account.signin',
+                    next=url_for('.presenter', short_name=app.short_name)))
+        else:
+            msg_1 = lazy_gettext(
+                "Ooops! You are an anonymous user and will not "
+                "get any credit"
+                " for your contributions.")
+            next_url = url_for(
+                'app.task_presenter', 
+                short_name=short_name,
+                task_id=task_id)
+            url = url_for(
+                'account.signin',
+                next=next_url)
+            flash(msg_1 + "<a href=\"" + url + "\">Sign in now!</a>", "warning")
     if app:
         title = "Application: %s &middot; Contribute" % app.name
     else:
         title = "Application not found"
 
-    if (task.app_id == app.id):
-        #return render_template('/applications/presenter.html', app = app)
-        # Check if the user has submitted a task before
-        if (current_user.is_anonymous()):
-            if not request.remote_addr:
-                remote_addr = "127.0.0.1"
-            else:
-                remote_addr = request.remote_addr
-            tr = db.session.query(model.TaskRun)\
-                   .filter(model.TaskRun.task_id == task_id)\
-                   .filter(model.TaskRun.app_id == app.id)\
-                   .filter(model.TaskRun.user_ip == remote_addr)
+    template_args = {"app": app, "title": title}
 
-        else:
-            tr = db.session.query(model.TaskRun)\
-                   .filter(model.TaskRun.task_id == task_id)\
-                   .filter(model.TaskRun.app_id == app.id)\
-                   .filter(model.TaskRun.user_id == current_user.id)
+    def respond(tmpl):
+        return render_template(tmpl, **template_args)
 
-        tr = tr.first()
-        if (tr is None):
-            return render_template('/applications/presenter.html',
-                                   title=title, app=app)
-        else:
-            return render_template('/applications/task/done.html',
-                                   title=title, app=app)
+    if not (task.app_id == app.id):
+        return respond('/applications/task/wrong.html')
+
+    #return render_template('/applications/presenter.html', app = app)
+    # Check if the user has submitted a task before
+
+    tr_search = db.session.query(model.TaskRun)\
+            .filter(model.TaskRun.task_id == task_id)\
+            .filter(model.TaskRun.app_id == app.id)
+
+    if current_user.is_anonymous():
+        remote_addr = request.remote_addr or "127.0.0.1"
+        tr = tr_search.filter(model.TaskRun.user_ip == remote_addr)
     else:
-        return render_template('/applications/task/wrong.html',
-                               title=title, app=app)
+        tr = tr_search.filter(model.TaskRun.user_id == current_user.id)
 
+    tr_first = tr.first()
+    if tr_first is None:
+        return respond('/applications/presenter.html')
+    else:
+        return respond('/applications/task/done.html')
 
 @blueprint.route('/<short_name>/presenter')
 @blueprint.route('/<short_name>/newtask')
@@ -628,6 +616,8 @@ def presenter(short_name):
     app = App.query.filter_by(short_name=short_name)\
         .first_or_404()
     title = "Application &middot; %s &middot; Contribute" % app.name
+    template_args = {"app": app, "title": title}
+
     if not app.allow_anonymous_contributors and current_user.is_anonymous():
         msg = "Oops! You have to sign in to participate in <strong>%s</strong> \
                application" % app.name
@@ -635,38 +625,24 @@ def presenter(short_name):
         return redirect(url_for('account.signin',
                         next=url_for('.presenter', short_name=app.short_name)))
 
-    if app.info.get("tutorial"):
-        if request.cookies.get(app.short_name + "tutorial") is None:
-            if (current_user.is_anonymous()):
-                msg_1 = lazy_gettext("Ooops! You are an anonymous user and will not \
-                                     get any credit for your contributions. Sign in \
-                                     now!")
-                flash(msg_1, "warning")
-            resp = make_response(render_template('/applications/tutorial.html',
-                                                 title=title,
-                                                 app=app))
-            resp.set_cookie(app.short_name + 'tutorial', 'seen')
-            return resp
-        else:
-            if (current_user.is_anonymous()):
-                msg_1 = lazy_gettext("Ooops! You are an anonymous user and will not \
-                                     get any credit for your contributions. Sign in \
-                                     now!")
-                flash(msg_1, "warning")
-            return render_template('/applications/presenter.html',
-                                   title=title,
-                                   app=app)
-    else:
-        if (current_user.is_anonymous()):
-            if (current_user.is_anonymous()):
-                msg_1 = lazy_gettext("Ooops! You are an anonymous user and will not \
-                                     get any credit for your contributions. Sign in \
-                                     now!")
-                flash(msg_1, "warning")
-        return render_template('/applications/presenter.html',
-                               title=title,
-                               app=app)
+    msg = "Ooops! You are an anonymous user and will not \
+           get any credit for your contributions. Sign in \
+           now!"
 
+    def respond(tmpl):
+        if (current_user.is_anonymous()):
+            msg_1 = lazy_gettext(msg)
+            flash(msg_1, "warning")
+        resp = make_response(render_template(tmpl, **template_args))
+        return resp
+
+    if app.info.get("tutorial") and \
+            request.cookies.get(app.short_name + "tutorial") is None:
+        resp = respond('/applications/tutorial.html')
+        resp.set_cookie(app.short_name + 'tutorial', 'seen')
+        return resp
+    else:
+        return respond('/applications/presenter.html')
 
 @blueprint.route('/<short_name>/tutorial')
 def tutorial(short_name):
@@ -685,15 +661,14 @@ def export(short_name, task_id):
             .filter(model.App.short_name == short_name)\
             .first()
 
-    if app:
-        task = db.session.query(model.Task)\
-                 .filter(model.Task.id == task_id)\
-                 .first()
-
-        results = [tr.dictize() for tr in task.task_runs]
-        return Response(json.dumps(results), mimetype='application/json')
-    else:
+    if not app:
         return abort(404)
+    task = db.session.query(model.Task)\
+        .filter(model.Task.id == task_id)\
+        .first()
+
+    results = [tr.dictize() for tr in task.task_runs]
+    return Response(json.dumps(results), mimetype='application/json')
 
 
 @blueprint.route('/<short_name>/tasks', defaults={'page': 1})
@@ -704,20 +679,18 @@ def tasks(short_name, page):
         title = "Application: %s &middot; Tasks" % app.name
     else:
         title = "Application not found"
-    try:
-        require.app.read(app)
-        require.app.update(app)
 
+    def respond():
         per_page = 10
         count = db.session.query(model.Task)\
-                  .filter_by(app_id=app.id)\
-                  .count()
+            .filter_by(app_id=app.id)\
+            .count()
         app_tasks = db.session.query(model.Task)\
-                      .filter_by(app_id=app.id)\
-                      .order_by(model.Task.id)\
-                      .limit(per_page)\
-                      .offset((page - 1) * per_page)\
-                      .all()
+            .filter_by(app_id=app.id)\
+            .order_by(model.Task.id)\
+            .limit(per_page)\
+            .offset((page - 1) * per_page)\
+            .all()
 
         if not app_tasks and page != 1:
             abort(404)
@@ -728,32 +701,17 @@ def tasks(short_name, page):
                                tasks=app_tasks,
                                title=title,
                                pagination=pagination)
+
+    try:
+        require.app.read(app)
+        require.app.update(app)
+        return respond()
     except HTTPException:
         if not app.hidden:
-            per_page = 10
-            count = db.session.query(model.Task)\
-                      .filter_by(app_id=app.id)\
-                      .count()
-            app_tasks = db.session.query(model.Task)\
-                          .filter_by(app_id=app.id)\
-                          .order_by(model.Task.id)\
-                          .limit(per_page)\
-                          .offset((page - 1) * per_page)\
-                          .all()
-
-            if not app_tasks and page != 1:
-                abort(404)
-
-            pagination = Pagination(page, per_page, count)
-            return render_template('/applications/tasks.html',
-                                   app=app,
-                                   tasks=app_tasks,
-                                   title=title,
-                                   pagination=pagination)
-        else:
-            return render_template('/applications/tasks.html',
-                                   title="Application not found",
-                                   app=None)
+            return respond()
+        return render_template('/applications/tasks.html',
+                               title="Application not found",
+                               app=None)
 
 
 @blueprint.route('/<short_name>/tasks/delete', methods=['GET', 'POST'])
@@ -818,59 +776,63 @@ def export_to(short_name):
             handle_row(writer, tr)
         yield out.getvalue()
 
+    def respond_json(ty):
+        tables = {"task": model.Task, "task_run": model.TaskRun}
+        try:
+            table = tables[ty]
+        except KeyError:
+            return abort(404)
+        return Response(gen_json(table), mimetype='application/json')
+
+    def respond_csv(ty):
+        # Export Task(/Runs) to CSV
+        types = {
+            "task": (
+                model.Task, handle_task,
+                (lambda x: True),
+                lazy_gettext(
+                    "Oops, the application does not have tasks to \
+                           export, if you are the owner add some tasks")),
+            "task_run": (
+                model.TaskRun, handle_task_run,
+                (lambda x: type(x.info) == dict),
+                lazy_gettext(
+                    "Oops, there are no Task Runs yet to export, invite \
+                           some users to participate"))
+            }
+        try:
+            table, handle_row, test, msg = types[ty]
+        except KeyError:
+            return abort(404)
+
+        out = StringIO()
+        writer = UnicodeWriter(out)
+        t = db.session.query(table)\
+            .filter_by(app_id=app.id)\
+            .first()
+        if t is not None:
+            if test(t):
+                writer.writerow(t.info.keys())
+
+            return Response(get_csv(out, writer, table, handle_row),
+                                mimetype='text/csv')
+        else:
+            flash(msg, 'info')
+            return render_template('/applications/export.html',
+                                   title=title,
+                                   app=app)
+
     ty = request.args.get('type')
     fmt = request.args.get('format')
-    if fmt and ty:
-        if fmt not in ["json", "csv"]:
+    if not (fmt and ty):
+        if len(request.args) >= 1:
             abort(404)
-        if fmt == 'json':
-            tables = {"task": model.Task, "task_run": model.TaskRun}
-            try:
-                table = tables[ty]
-            except KeyError:
-                return abort(404)
-            return Response(gen_json(table), mimetype='application/json')
-        elif fmt == 'csv':
-            # Export Task(/Runs) to CSV
-            types = {
-                "task": (
-                    model.Task, handle_task,
-                    (lambda x: True),
-                    lazy_gettext("Oops, the application does not have tasks to \
-                           export, if you are the owner add some tasks")),
-                "task_run": (
-                    model.TaskRun, handle_task_run,
-                    (lambda x: type(x.info) == dict),
-                    lazy_gettext("Oops, there are no Task Runs yet to export, invite \
-                           some users to participate"))
-                }
-            try:
-                table, handle_row, test, msg = types[ty]
-            except KeyError:
-                return abort(404)
-
-            out = StringIO()
-            writer = UnicodeWriter(out)
-            t = db.session.query(table)\
-                .filter_by(app_id=app.id)\
-                .first()
-            if t is not None:
-                if test(t):
-                    writer.writerow(t.info.keys())
-
-                return Response(get_csv(out, writer, table, handle_row),
-                                mimetype='text/csv')
-            else:
-                flash(msg, 'info')
-                return render_template('/applications/export.html',
-                                       title=title,
-                                       app=app)
-    elif len(request.args) >= 1:
-        abort(404)
-    else:
         return render_template('/applications/export.html',
                                title=title,
                                app=app)
+    if fmt not in ["json", "csv"]:
+        abort(404)
+    return {"json": respond_json, "csv": respond_csv}[fmt](ty)
 
 
 @blueprint.route('/<short_name>/stats')
@@ -878,36 +840,38 @@ def show_stats(short_name):
     """Returns App Stats"""
     app = db.session.query(model.App).filter_by(short_name=short_name).first()
     title = "Application: %s &middot; Statistics" % app.name
-    if len(app.tasks) > 0 and len(app.task_runs) > 0:
-        dates_stats, hours_stats, users_stats = stats.get_stats(app.id,
-                                                                current_app.config['GEO'])
-        anon_pct_taskruns = int((users_stats['n_anon'] * 100) /
-                                (users_stats['n_anon'] + users_stats['n_auth']))
-        userStats = dict(
-            geo=current_app.config['GEO'],
-            anonymous=dict(
-                users=users_stats['n_anon'],
-                taskruns=users_stats['n_anon'],
-                pct_taskruns=anon_pct_taskruns,
-                top5=users_stats['anon']['top5']),
-            authenticated=dict(
-                users=users_stats['n_auth'],
-                taskruns=users_stats['n_auth'],
-                pct_taskruns=100 - anon_pct_taskruns,
-                top5=users_stats['auth']['top5']))
 
-        tmp = dict(userStats=users_stats['users'],
-                   userAnonStats=users_stats['anon'],
-                   userAuthStats=users_stats['auth'],
-                   dayStats=dates_stats,
-                   hourStats=hours_stats)
-
-        return render_template('/applications/stats.html',
-                               title=title,
-                               appStats=json.dumps(tmp),
-                               userStats=userStats,
-                               app=app)
-    else:
+    if not (len(app.tasks) > 0 and len(app.task_runs) > 0):
         return render_template('/applications/non_stats.html',
                                title=title,
                                app=app)
+
+    dates_stats, hours_stats, users_stats = stats.get_stats(
+        app.id,
+        current_app.config['GEO'])
+    anon_pct_taskruns = int((users_stats['n_anon'] * 100) /
+                            (users_stats['n_anon'] + users_stats['n_auth']))
+    userStats = dict(
+        geo=current_app.config['GEO'],
+        anonymous=dict(
+            users=users_stats['n_anon'],
+            taskruns=users_stats['n_anon'],
+            pct_taskruns=anon_pct_taskruns,
+            top5=users_stats['anon']['top5']),
+        authenticated=dict(
+            users=users_stats['n_auth'],
+            taskruns=users_stats['n_auth'],
+            pct_taskruns=100 - anon_pct_taskruns,
+            top5=users_stats['auth']['top5']))
+
+    tmp = dict(userStats=users_stats['users'],
+               userAnonStats=users_stats['anon'],
+               userAuthStats=users_stats['auth'],
+               dayStats=dates_stats,
+               hourStats=hours_stats)
+
+    return render_template('/applications/stats.html',
+                           title=title,
+                           appStats=json.dumps(tmp),
+                           userStats=userStats,
+                           app=app)
