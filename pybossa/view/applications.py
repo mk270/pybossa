@@ -512,6 +512,7 @@ def import_task(short_name):
     if template in googledocs_urls:
         template_args["gdform"].googledocs_url.data = googledocs_urls[template]
     
+    europeanaform = template_args["europeanaform"]
     if 'europeana_search_term' in request.form and europeanaform.validate_on_submit():
         def reader():
             for photo in get_flickr_photos(
