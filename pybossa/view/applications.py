@@ -104,61 +104,48 @@ class BulkTaskEpiCollectPlusImportForm(Form):
 @blueprint.route('/page/<int:page>')
 def index(page):
     """By default show the Featured apps"""
-    if require.app.read():
-        per_page = 5
+    return app_index(page, cached_apps.get_featured, 'app-featured',
+                     True, False)
 
-        apps, count = cached_apps.get_featured(page, per_page)
 
-        if apps:
-            pagination = Pagination(page, per_page, count)
-            return render_template('/applications/index.html',
-                                   title=lazy_gettext("Applications"),
-                                   apps=apps,
-                                   pagination=pagination,
-                                   app_type='app-featured')
-        else:
-            return redirect(url_for('.published'))
-    else:
+def app_index(page, lookup, app_type, fallback, use_count):
+    """Show apps of app_type"""
+    if not require.app.read():
         abort(403)
+
+    per_page = 5
+
+    apps, count = lookup(page, per_page)
+
+    if fallback and not apps:
+        return redirect(url_for('.published'))
+
+    pagination = Pagination(page, per_page, count)
+    template_args = {
+        "apps": apps,
+        "title": lazy_gettext("Applications"),
+        "pagination": pagination,
+        "app_type": app_type
+        }
+    if use_count:
+        template_args.update({"count": count})
+    return render_template('/applications/index.html', **template_args)
 
 
 @blueprint.route('/published', defaults={'page': 1})
 @blueprint.route('/published/page/<int:page>')
 def published(page):
     """Show the Published apps"""
-    if require.app.read():
-        per_page = 5
-
-        apps, count = cached_apps.get_published(page, per_page)
-
-        pagination = Pagination(page, per_page, count)
-        return render_template('/applications/index.html',
-                               title=lazy_gettext("Applications"),
-                               apps=apps,
-                               count=count,
-                               pagination=pagination,
-                               app_type='app-published')
-    else:
-        abort(403)
+    return app_index(page, cached_apps.get_published, 'app-published', 
+                     False, True)
 
 
 @blueprint.route('/draft', defaults={'page': 1})
 @blueprint.route('/draft/page/<int:page>')
 def draft(page):
-    if require.app.read():
-        per_page = 5
-
-        apps, count = cached_apps.get_draft(page, per_page)
-
-        pagination = Pagination(page, per_page, count)
-        return render_template('/applications/index.html',
-                               title=lazy_gettext("Applications"),
-                               apps=apps,
-                               count=count,
-                               pagination=pagination,
-                               app_type='app-draft')
-    else:
-        abort(403)
+    """Show the Draft apps"""
+    return app_index(page, cached_apps.get_draft, 'app-draft', 
+                     False, True)
 
 
 @blueprint.route('/new', methods=['GET', 'POST'])
@@ -269,90 +256,85 @@ def task_presenter_editor(short_name):
 @login_required
 def delete(short_name):
     app = App.query.filter_by(short_name=short_name).first()
-    if app:
-        title = "Application: %s &middot; Delete" % app.name
-        if require.app.delete(app):
-            if request.method == 'GET':
-                return render_template('/applications/delete.html',
-                                       title=title,
-                                       app=app)
-            else:
-                # Clean cache
-                cached_apps.clean(app.id)
-                db.session.delete(app)
-                db.session.commit()
-                flash(lazy_gettext('Application deleted!'), 'success')
-                return redirect(url_for('account.profile'))
-        else:
-            abort(403)
-    else:
+    if not app:
         abort(404)
 
+    title = "Application: %s &middot; Delete" % app.name
+    if not require.app.delete(app):
+        abort(403)
+    if request.method == 'GET':
+        return render_template('/applications/delete.html',
+                                   title=title,
+                                   app=app)
+    # Clean cache
+    cached_apps.clean(app.id)
+    db.session.delete(app)
+    db.session.commit()
+    flash(lazy_gettext('Application deleted!'), 'success')
+    return redirect(url_for('account.profile'))
 
 @blueprint.route('/<short_name>/update', methods=['GET', 'POST'])
 @login_required
 def update(short_name):
     app = App.query.filter_by(short_name=short_name).first_or_404()
-    if require.app.update(app):
-        title = "Application: %s &middot; Update" % app.name
-        if request.method == 'GET':
-            form = AppForm(obj=app)
-            form.populate_obj(app)
-            if app.info.get('thumbnail'):
-                form.thumbnail.data = app.info['thumbnail']
-            if app.info.get('sched'):
-                for s in form.sched.choices:
-                    if app.info['sched'] == s[0]:
-                        form.sched.data = s[0]
-                        break
 
-            return render_template('/applications/update.html',
-                                   title=title,
-                                   form=form,
-                                   app=app)
+    def handle_valid_form(form):
+        hidden = int(form.hidden.data)
 
-        if request.method == 'POST':
-            form = AppForm(request.form)
-            if form.validate():
-                if form.hidden.data:
-                    hidden = 1
-                else:
-                    hidden = 0
+        new_info = {}
+        # Add the info items
+        app = App.query.filter_by(short_name=short_name).first_or_404()
+        if form.thumbnail.data:
+            new_info['thumbnail'] = form.thumbnail.data
+        if form.sched.data:
+            new_info['sched'] = form.sched.data
 
-                new_info = {}
-                # Add the info items
-                app = App.query.filter_by(short_name=short_name).first_or_404()
-                if form.thumbnail.data:
-                    new_info['thumbnail'] = form.thumbnail.data
-                if form.sched.data:
-                    new_info['sched'] = form.sched.data
+        # Merge info object
+        info = dict(app.info.items() + new_info.items())
 
-                # Merge info object
-                info = dict(app.info.items() + new_info.items())
+        new_application = model.App(
+            id=form.id.data,
+            name=form.name.data,
+            short_name=form.short_name.data,
+            description=form.description.data,
+            long_description=form.long_description.data,
+            hidden=hidden,
+            info=info,
+            owner_id=app.owner_id,
+            allow_anonymous_contributors=form.allow_anonymous_contributors.data
+            )
+        app = App.query.filter_by(short_name=short_name).first_or_404()
+        db.session.merge(new_application)
+        db.session.commit()
+        flash(lazy_gettext('Application updated!'), 'success')
+        return redirect(url_for('.details',
+                                short_name=new_application.short_name))
 
-                new_application = model.App(id=form.id.data,
-                                            name=form.name.data,
-                                            short_name=form.short_name.data,
-                                            description=form.description.data,
-                                            long_description=form.long_description.data,
-                                            hidden=hidden,
-                                            info=info,
-                                            owner_id=app.owner_id,
-                                            allow_anonymous_contributors=form.allow_anonymous_contributors.data)
-                app = App.query.filter_by(short_name=short_name).first_or_404()
-                db.session.merge(new_application)
-                db.session.commit()
-                flash(lazy_gettext('Application updated!'), 'success')
-                return redirect(url_for('.details',
-                                        short_name=new_application.short_name))
-            else:
-                flash(lazy_gettext('Please correct the errors'), 'error')
-                return render_template('/applications/update.html',
-                                       form=form,
-                                       title=title,
-                                       app=app)
-    else:
+    if not require.app.update(app):
         abort(403)
+
+    title = "Application: %s &middot; Update" % app.name
+    if request.method == 'GET':
+        form = AppForm(obj=app)
+        form.populate_obj(app)
+        if app.info.get('thumbnail'):
+            form.thumbnail.data = app.info['thumbnail']
+        if app.info.get('sched'):
+            for s in form.sched.choices:
+                if app.info['sched'] == s[0]:
+                    form.sched.data = s[0]
+                    break
+
+    if request.method == 'POST':
+        form = AppForm(request.form)
+        if form.validate():
+            return handle_valid_form(form)
+        flash(lazy_gettext('Please correct the errors'), 'error')
+
+    return render_template('/applications/update.html',
+                           form=form,
+                           title=title,
+                           app=app)
 
 
 @blueprint.route('/<short_name>/')
@@ -573,54 +555,59 @@ def task_presenter(short_name, task_id):
     app = App.query.filter_by(short_name=short_name).first_or_404()
     task = Task.query.filter_by(id=task_id).first_or_404()
 
-    if not app.allow_anonymous_contributors and current_user.is_anonymous():
-        msg = "Oops! You have to sign in to participate in <strong>%s</strong> \
-               application" % app.name
-        flash(lazy_gettext(msg), 'warning')
-        return redirect(url_for('account.signin',
-                        next=url_for('.presenter', short_name=app.short_name)))
-    if (current_user.is_anonymous()):
-        msg_1 = lazy_gettext("Ooops! You are an anonymous user and will not get any credit "
-                             " for your contributions.")
-        flash(msg_1 + "<a href=\"" + url_for('account.signin',
-              next=url_for('app.task_presenter', short_name=short_name,
-                           task_id=task_id))
-              + "\">Sign in now!</a>", "warning")
+    if current_user.is_anonymous():
+        if not app.allow_anonymous_contributors:
+            msg = ("Oops! You have to sign in to participate in "
+                   "<strong>%s</strong>"
+                   "application" % app.name)
+            flash(lazy_gettext(msg), 'warning')
+            return redirect(url_for(
+                    'account.signin',
+                    next=url_for('.presenter', short_name=app.short_name)))
+        else:
+            msg_1 = lazy_gettext(
+                "Ooops! You are an anonymous user and will not "
+                "get any credit"
+                " for your contributions.")
+            next_url = url_for(
+                'app.task_presenter', 
+                short_name=short_name,
+                task_id=task_id)
+            url = url_for(
+                'account.signin',
+                next=next_url)
+            flash(msg_1 + "<a href=\"" + url + "\">Sign in now!</a>", "warning")
     if app:
         title = "Application: %s &middot; Contribute" % app.name
     else:
         title = "Application not found"
 
-    if (task.app_id == app.id):
-        #return render_template('/applications/presenter.html', app = app)
-        # Check if the user has submitted a task before
-        if (current_user.is_anonymous()):
-            if not request.remote_addr:
-                remote_addr = "127.0.0.1"
-            else:
-                remote_addr = request.remote_addr
-            tr = db.session.query(model.TaskRun)\
-                   .filter(model.TaskRun.task_id == task_id)\
-                   .filter(model.TaskRun.app_id == app.id)\
-                   .filter(model.TaskRun.user_ip == remote_addr)
+    template_args = {"app": app, "title": title}
 
-        else:
-            tr = db.session.query(model.TaskRun)\
-                   .filter(model.TaskRun.task_id == task_id)\
-                   .filter(model.TaskRun.app_id == app.id)\
-                   .filter(model.TaskRun.user_id == current_user.id)
+    def respond(tmpl):
+        return render_template(tmpl, **template_args)
 
-        tr = tr.first()
-        if (tr is None):
-            return render_template('/applications/presenter.html',
-                                   title=title, app=app)
-        else:
-            return render_template('/applications/task/done.html',
-                                   title=title, app=app)
+    if not (task.app_id == app.id):
+        return respond('/applications/task/wrong.html')
+
+    #return render_template('/applications/presenter.html', app = app)
+    # Check if the user has submitted a task before
+
+    tr_search = db.session.query(model.TaskRun)\
+            .filter(model.TaskRun.task_id == task_id)\
+            .filter(model.TaskRun.app_id == app.id)
+
+    if current_user.is_anonymous():
+        remote_addr = request.remote_addr or "127.0.0.1"
+        tr = tr_search.filter(model.TaskRun.user_ip == remote_addr)
     else:
-        return render_template('/applications/task/wrong.html',
-                               title=title, app=app)
+        tr = tr_search.filter(model.TaskRun.user_id == current_user.id)
 
+    tr_first = tr.first()
+    if tr_first is None:
+        return respond('/applications/presenter.html')
+    else:
+        return respond('/applications/task/done.html')
 
 @blueprint.route('/<short_name>/presenter')
 @blueprint.route('/<short_name>/newtask')
@@ -628,6 +615,8 @@ def presenter(short_name):
     app = App.query.filter_by(short_name=short_name)\
         .first_or_404()
     title = "Application &middot; %s &middot; Contribute" % app.name
+    template_args = {"app": app, "title": title}
+
     if not app.allow_anonymous_contributors and current_user.is_anonymous():
         msg = "Oops! You have to sign in to participate in <strong>%s</strong> \
                application" % app.name
@@ -635,38 +624,24 @@ def presenter(short_name):
         return redirect(url_for('account.signin',
                         next=url_for('.presenter', short_name=app.short_name)))
 
-    if app.info.get("tutorial"):
-        if request.cookies.get(app.short_name + "tutorial") is None:
-            if (current_user.is_anonymous()):
-                msg_1 = lazy_gettext("Ooops! You are an anonymous user and will not \
-                                     get any credit for your contributions. Sign in \
-                                     now!")
-                flash(msg_1, "warning")
-            resp = make_response(render_template('/applications/tutorial.html',
-                                                 title=title,
-                                                 app=app))
-            resp.set_cookie(app.short_name + 'tutorial', 'seen')
-            return resp
-        else:
-            if (current_user.is_anonymous()):
-                msg_1 = lazy_gettext("Ooops! You are an anonymous user and will not \
-                                     get any credit for your contributions. Sign in \
-                                     now!")
-                flash(msg_1, "warning")
-            return render_template('/applications/presenter.html',
-                                   title=title,
-                                   app=app)
-    else:
-        if (current_user.is_anonymous()):
-            if (current_user.is_anonymous()):
-                msg_1 = lazy_gettext("Ooops! You are an anonymous user and will not \
-                                     get any credit for your contributions. Sign in \
-                                     now!")
-                flash(msg_1, "warning")
-        return render_template('/applications/presenter.html',
-                               title=title,
-                               app=app)
+    msg = "Ooops! You are an anonymous user and will not \
+           get any credit for your contributions. Sign in \
+           now!"
 
+    def respond(tmpl):
+        if (current_user.is_anonymous()):
+            msg_1 = lazy_gettext(msg)
+            flash(msg_1, "warning")
+        resp = make_response(render_template(tmpl, **template_args))
+        return resp
+
+    if app.info.get("tutorial") and \
+            request.cookies.get(app.short_name + "tutorial") is None:
+        resp = respond('/applications/tutorial.html')
+        resp.set_cookie(app.short_name + 'tutorial', 'seen')
+        return resp
+    else:
+        return respond('/applications/presenter.html')
 
 @blueprint.route('/<short_name>/tutorial')
 def tutorial(short_name):
@@ -878,36 +853,38 @@ def show_stats(short_name):
     """Returns App Stats"""
     app = db.session.query(model.App).filter_by(short_name=short_name).first()
     title = "Application: %s &middot; Statistics" % app.name
-    if len(app.tasks) > 0 and len(app.task_runs) > 0:
-        dates_stats, hours_stats, users_stats = stats.get_stats(app.id,
-                                                                current_app.config['GEO'])
-        anon_pct_taskruns = int((users_stats['n_anon'] * 100) /
-                                (users_stats['n_anon'] + users_stats['n_auth']))
-        userStats = dict(
-            geo=current_app.config['GEO'],
-            anonymous=dict(
-                users=users_stats['n_anon'],
-                taskruns=users_stats['n_anon'],
-                pct_taskruns=anon_pct_taskruns,
-                top5=users_stats['anon']['top5']),
-            authenticated=dict(
-                users=users_stats['n_auth'],
-                taskruns=users_stats['n_auth'],
-                pct_taskruns=100 - anon_pct_taskruns,
-                top5=users_stats['auth']['top5']))
 
-        tmp = dict(userStats=users_stats['users'],
-                   userAnonStats=users_stats['anon'],
-                   userAuthStats=users_stats['auth'],
-                   dayStats=dates_stats,
-                   hourStats=hours_stats)
-
-        return render_template('/applications/stats.html',
-                               title=title,
-                               appStats=json.dumps(tmp),
-                               userStats=userStats,
-                               app=app)
-    else:
+    if not (len(app.tasks) > 0 and len(app.task_runs) > 0):
         return render_template('/applications/non_stats.html',
                                title=title,
                                app=app)
+
+    dates_stats, hours_stats, users_stats = stats.get_stats(
+        app.id,
+        current_app.config['GEO'])
+    anon_pct_taskruns = int((users_stats['n_anon'] * 100) /
+                            (users_stats['n_anon'] + users_stats['n_auth']))
+    userStats = dict(
+        geo=current_app.config['GEO'],
+        anonymous=dict(
+            users=users_stats['n_anon'],
+            taskruns=users_stats['n_anon'],
+            pct_taskruns=anon_pct_taskruns,
+            top5=users_stats['anon']['top5']),
+        authenticated=dict(
+            users=users_stats['n_auth'],
+            taskruns=users_stats['n_auth'],
+            pct_taskruns=100 - anon_pct_taskruns,
+            top5=users_stats['auth']['top5']))
+
+    tmp = dict(userStats=users_stats['users'],
+               userAnonStats=users_stats['anon'],
+               userAuthStats=users_stats['auth'],
+               dayStats=dates_stats,
+               hourStats=hours_stats)
+
+    return render_template('/applications/stats.html',
+                           title=title,
+                           appStats=json.dumps(tmp),
+                           userStats=userStats,
+                           app=app)
