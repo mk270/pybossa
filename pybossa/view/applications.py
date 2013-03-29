@@ -483,34 +483,32 @@ def get_epicollect_data_from_request(app, r):
 def import_task(short_name):
     app = App.query.filter_by(short_name=short_name).first_or_404()
     title = "Applications: %s &middot; Import Tasks" % app.name
+    template_args = {"title": title, "app": app}
 
-    data_handlers = [
-        ('csv_url', get_csv_data_from_request),
-        ('googledocs_url', get_csv_data_from_request),
-        ('epicollect_project', get_epicollect_data_from_request)
-        ]
+    importer_forms = [
+        ('csv_url', get_csv_data_from_request,
+         'csvform', BulkTaskCSVImportForm),
+        ('googledocs_url', get_csv_data_from_request,
+         'gdform', BulkTaskGDImportForm),
+        ('epicollect_project', get_epicollect_data_from_request,
+         'epiform', BulkTaskEpiCollectPlusImportForm),
+        ('europeana_search_term', (lambda : None),
+         'europeanaform', BulkTaskEuropeanaImportForm)
+        ]        
 
-    csvform = BulkTaskCSVImportForm(request.form)
-    gdform = BulkTaskGDImportForm(request.form)
-    europeanaform = BulkTaskEuropeanaImportForm(request.form)
-    epiform = BulkTaskEpiCollectPlusImportForm(request.form)
+    data_handlers = [(name, handler) for name, handler, _, _ in importer_forms]
 
-    template_args = {
-        "title": title,
-        "app": app,
-        "csvform": csvform,
-        "europeanaform": europeanaform,
-        "epiform": epiform,
-        "gdform": gdform
-        }
-
+    forms = [(form_name, cls(request.form)) 
+             for _, _, form_name, cls in importer_forms]
+    template_args.update(dict(forms))
+    
     template = request.args.get('template')
     if not (app.tasks or template or request.method == 'POST'):
         return render_template('/applications/import_options.html',
                                **template_args)
 
     if template in googledocs_urls:
-        gdform.googledocs_url.data = googledocs_urls[template]
+        template_args["gdform"].googledocs_url.data = googledocs_urls[template]
     
     if 'europeana_search_term' in request.form and europeanaform.validate_on_submit():
         def reader():
