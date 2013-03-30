@@ -54,7 +54,7 @@
         // continue as soon as the image is loaded
         deferred.resolve(task);
       });
-      img.attr('src', task.info.url_b).css('height', 460);
+      img.attr('src', task.info.url_b);
       img.addClass('img-polaroid');
       task.info.image = img;
 
@@ -88,7 +88,7 @@
     if ( !$.isEmptyObject(task) ) {
         culttag.loadUserProgress(module, short_name);
         $('#photo-link').html('').append(task.info.image);
-        $("#photo-link").attr("href", task.info.link);
+        //$("#photo-link").attr("href", task.info.link);
         $("#question").html(task.info.question);
 	  $("#imgTitle").html(task.info.title);
 	  $("#imgCreator").html(task.info.creator);
