@@ -5,13 +5,6 @@
     return [ [ { "label": "Yes", "value": "yes" },
                { "label": "No", "value": "no" },
                { "label": "Skip", "value": "skipped" } ] ];
-
-    return [ [ { "label": "Person", "value": "yes6" },
-               { "label": "Royal", "value": "yes5" },
-               { "label": "Animal", "value": "yes4" } ],
-             [ { "label": "Happy", "value": "yes3" },
-               { "label": "Smile", "value": "yes2" },
-               { "label": "Empty", "value": "yes1" } ] ];
   };
 
   function loadUserProgress(pybossa, short_name) {
