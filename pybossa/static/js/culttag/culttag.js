@@ -57,7 +57,7 @@
       img.attr('src', task.info.url_b);
       img.addClass('img-polaroid');
       task.info.image = img;
-
+	  
     }
     else {
       deferred.resolve(task);
@@ -83,26 +83,26 @@
     };
 
     if ( !$.isEmptyObject(task) ) {
-        culttag.loadUserProgress(module, short_name);
-        $('#photo-link').html('').append(task.info.image);
-        //$("#photo-link").attr("href", task.info.link);
-        $("#question").html(task.info.question);
+      culttag.loadUserProgress(module, short_name);
+      $('#photo-link').html('').append(task.info.image);
+      //$("#photo-link").attr("href", task.info.link);
+      $("#question").html(task.info.question);
       $("#imgTitle").html(task.info.title);
       $("#imgCreator").html(task.info.creator);
-//    $("#imgYear").html(task.info.date);
+	  //$("#imgYear").html(task.info.date);
       
-        $('#task-id').html(task.id);
-        addTagButtons(task);
-        $('.btn-answer').off('click').on('click', answered_cb);
-        $("#loading").hide();
+      $('#task-id').html(task.id);
+      addTagButtons(task);
+      $('.btn-answer').off('click').on('click', answered_cb);
+      $("#loading").hide();
     }
     else {
-        $(".skeleton").hide();
-        $("#loading").hide();
-        $("#finish").fadeIn(500);
+      $(".skeleton").hide();
+      $("#loading").hide();
+      $("#finish").fadeIn(500);
     }
   };
-
+  
   function presentTask(module, short_name) {
     return function(task, deferred) {
       return _presentTask(task, deferred, module, short_name);
