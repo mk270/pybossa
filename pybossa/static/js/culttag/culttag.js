@@ -66,12 +66,9 @@
 
   function _presentTask(task, deferred, module, short_name) {
 	var answered_cb = function(evt) {
-	  console.log("in answ");
       var answer = $(evt.target).attr("value");
       if (typeof answer != 'undefined') {
-        console.log(answer);
         module.saveTask(task.id, answer).done(function() {
-		  console.log("in cb");
           deferred.resolve();
         });
         $("#loading").fadeIn(500);
