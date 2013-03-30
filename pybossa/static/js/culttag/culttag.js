@@ -82,7 +82,7 @@
       $("#question").html(task.info.question);
       $("#imgTitle").html(task.info.title);
       $("#imgCreator").html(task.info.creator);
-	  //$("#imgYear").html(task.info.date);
+      //$("#imgYear").html(task.info.date);
       
       $('#task-id').html(task.id);
       addTagButtons(task);
