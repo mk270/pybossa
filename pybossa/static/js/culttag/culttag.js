@@ -54,7 +54,7 @@
         // continue as soon as the image is loaded
         deferred.resolve(task);
       });
-      img.attr('src', task.info.url_b).css('height', 460);
+      img.attr('src', task.info.url_b);
       img.addClass('img-polaroid');
       task.info.image = img;
 
