@@ -39,18 +39,35 @@
   };
 
   function _taskLoaded(task, deferred) {
-
     if ( !$.isEmptyObject(task) ) {
-      // load image from flickr
-      var img = $('<img />');
+	  var img_loaded = false;
+	  var img2_loaded = false;
+
+	  function both_loaded() {
+		console.log(img_loaded, img2_loaded);
+		if (img_loaded && img2_loaded) {
+		  deferred.resolve(task);
+		}
+	  }
+
+      var img = $('<img id="img1" />');
       img.load(function() {
-        // continue as soon as the image is loaded
-        deferred.resolve(task);
+		img_loaded = true;
+		both_loaded();
       });
+	  var img2 = $('<img id="img2" />');
+	  img2.load(function() {
+		img2_loaded = true;
+		both_loaded();
+	  });
+
       img.attr('src', task.info.url_b);
       img.addClass('img-polaroid');
       task.info.image = img;
-	  
+      img2.attr('src', task.info.url_b2);
+      img2.addClass('img-polaroid');
+      task.info.image2 = img2;
+      addTagButtons(task);
     }
     else {
       deferred.resolve(task);
@@ -77,7 +94,7 @@
 
     if ( !$.isEmptyObject(task) ) {
       culttag.loadUserProgress(module, short_name);
-      $('#photo-link').html('').append(task.info.image);
+      $('#photo-link').html('').append(task.info.image).append(task.info.image2);
       //$("#photo-link").attr("href", task.info.link);
       $("#question").html(task.info.question);
       $("#imgTitle").html(task.info.title);
@@ -85,7 +102,6 @@
       //$("#imgYear").html(task.info.date);
       
       $('#task-id').html(task.id);
-      addTagButtons(task);
       $('.btn-answer').off('click').on('click', answered_cb);
       $("#loading").hide();
     }
