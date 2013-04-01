@@ -493,13 +493,13 @@ def import_task(short_name):
     
     europeanaform = template_args["europeanaform"]
     if 'europeana_search_term' in request.form and europeanaform.validate_on_submit():
-        def reader():
+        def europeana_reader():
             for photo in get_flickr_photos(
                 europeanaform.europeana_api_key.data,
                 europeanaform.europeana_search_term.data):
                 yield photo
 
-        import_csv_tasks(app, reader())
+        import_csv_tasks(app, europeana_reader())
         flash('Tasks imported successfully!', 'success')
         return redirect(url_for('.details', short_name=app.short_name))
 
