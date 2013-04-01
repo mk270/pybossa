@@ -470,6 +470,9 @@ def handle_import_from_epicollect(app, form):
     r = requests.get(dataurl)
     return get_epicollect_data_from_request(app, r)
 
+def handle_import_from_europeana(app, form):
+    return import_csv_tasks(app, europeana_reader(form))
+
 @blueprint.route('/<short_name>/import', methods=['GET', 'POST'])
 def import_task(short_name):
     app = App.query.filter_by(short_name=short_name).first_or_404()
@@ -483,7 +486,7 @@ def import_task(short_name):
         ('googledocs_url', handle_import_from_gdocs,
          'gdform', importer.BulkTaskGDImportForm, "gdocs",
          get_data_url_for_gdocs),
-        ('europeana_search_term', (lambda : None),
+        ('europeana_search_term', handle_import_from_europeana,
          'europeanaform', BulkTaskEuropeanaImportForm, "europeana"
          (lambda : None)),
         ('epicollect_project', handle_import_from_epicollect,
