@@ -21,6 +21,7 @@ from pybossa.core import db
 from pybossa.util import unicode_csv_reader
 import json
 import requests
+from get_photos import get_flickr_photos
 
 
 class BulkImportException(Exception):
@@ -123,6 +124,11 @@ def get_data_url_for_epicollect(form):
     return 'http://plus.epicollect.net/%s/%s.json' % \
         (form.epicollect_project.data, form.epicollect_form.data)
 
+def europeana_reader(europeanaform):
+    for photo in get_flickr_photos(
+        europeanaform.europeana_api_key.data,
+        europeanaform.europeana_search_term.data):
+        yield photo
 
 def get_csv_data_from_request(app, r):
     if r.status_code == 403:
