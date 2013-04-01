@@ -1,9 +1,3 @@
-from flaskext.wtf import Form, TextField, validators
-
-class BulkTaskEuropeanaImportForm(Form):
-    europeana_search_term = TextField('Search string', [validators.Required(message="You must "
-                "provide a search term")])
-    europeana_api_key = TextField('API key', [validators.Required(message="You must provide a Europeana API key")])
 
 def get_flickr_photos(api_key, search_term, size="big"):
     import europeana
