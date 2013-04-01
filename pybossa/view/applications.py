@@ -424,6 +424,11 @@ def get_data_url_for_epicollect(form):
     return 'http://plus.epicollect.net/%s/%s.json' % \
         (form.epicollect_project.data, form.epicollect_form.data)
 
+def europeana_reader(europeanaform):
+    for photo in get_flickr_photos(
+        europeanaform.europeana_api_key.data,
+        europeanaform.europeana_search_term.data):
+        yield photo
 
 def get_csv_data_from_request(app, r):
     if r.status_code == 403:
@@ -493,12 +498,6 @@ def import_task(short_name):
     
     europeanaform = template_args["europeanaform"]
     if 'europeana_search_term' in request.form and europeanaform.validate_on_submit():
-        def europeana_reader(europeanaform):
-            for photo in get_flickr_photos(
-                europeanaform.europeana_api_key.data,
-                europeanaform.europeana_search_term.data):
-                yield photo
-
         import_csv_tasks(app, europeana_reader(europeanaform))
         flash('Tasks imported successfully!', 'success')
         return redirect(url_for('.details', short_name=app.short_name))
