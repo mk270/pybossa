@@ -32,8 +32,6 @@ from pybossa.util import Unique, Pagination, unicode_csv_reader, UnicodeWriter
 from pybossa.auth import require
 from pybossa.cache import apps as cached_apps
 
-from get_photos import get_flickr_photos, BulkTaskEuropeanaImportForm
-
 import json
 import importer
 
