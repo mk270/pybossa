@@ -513,12 +513,6 @@ def import_task(short_name):
         if mode is not None:
             template_args["gdform"].googledocs_url.data = googledocs_urls[mode]
     
-    europeanaform = template_args["europeanaform"]
-    if 'europeana_search_term' in request.form and europeanaform.validate_on_submit():
-        import_csv_tasks(app, europeana_reader(europeanaform))
-        flash('Tasks imported successfully!', 'success')
-        return redirect(url_for('.details', short_name=app.short_name))
-
     form = None
     handler = None
     for k, v in data_handlers.iteritems():
