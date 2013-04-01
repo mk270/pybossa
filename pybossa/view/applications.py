@@ -517,7 +517,8 @@ def import_task(short_name):
 
     if template =='gdocs':
         mode = request.args.get('mode')
-        template_args["gdform"].googledocs_url.data = googledocs_urls[mode]
+        if mode is not None:
+            template_args["gdform"].googledocs_url.data = googledocs_urls[mode]
     
     europeanaform = template_args["europeanaform"]
     if 'europeana_search_term' in request.form and europeanaform.validate_on_submit():
