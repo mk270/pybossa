@@ -24,6 +24,19 @@ import requests
 from get_photos import get_flickr_photos
 
 
+importers = []
+
+def register_importer(cls):
+    importers.append(cls)
+    return cls
+
+def enabled_importers(enabled_importer_names=None):
+    if enabled_importer_names is None:
+        return importers
+    check = lambda i: i.template_id in enabled_importer_names
+    return filter(check, importers)
+
+
 class BulkImportException(Exception):
     pass
 
@@ -89,6 +102,7 @@ class BulkTaskImportForm(Form):
         return self.import_csv_tasks(app, csvreader)
 
 
+@register_importer
 class BulkTaskCSVImportForm(BulkTaskImportForm):
     msg_required = lazy_gettext("You must provide a URL")
     msg_url = lazy_gettext("Oops! That's not a valid URL. "
@@ -109,6 +123,7 @@ class BulkTaskCSVImportForm(BulkTaskImportForm):
         return self.get_csv_data_from_request(app, r)
 
 
+@register_importer
 class BulkTaskGDImportForm(BulkTaskImportForm):
     msg_required = lazy_gettext("You must provide a URL")
     msg_url = lazy_gettext("Oops! That's not a valid URL. "
@@ -129,6 +144,7 @@ class BulkTaskGDImportForm(BulkTaskImportForm):
         return self.get_csv_data_from_request(app, r)
 
 
+@register_importer
 class BulkTaskEpiCollectPlusImportForm(BulkTaskImportForm):
     msg_required = lazy_gettext("You must provide an EpiCollect Plus "
                                 "project name")
@@ -169,6 +185,7 @@ class BulkTaskEpiCollectPlusImportForm(BulkTaskImportForm):
         return self.get_epicollect_data_from_request(app, r)
 
 
+@register_importer
 class BulkTaskEuropeanaImportForm(BulkTaskImportForm):
     europeana_search_term = TextField('Search string', [validators.Required(message="You must "
                 "provide a search term")])
@@ -200,9 +217,4 @@ googledocs_urls = {
     'pdf': "https://docs.google.com/spreadsheet/ccc"
            "?key=0AsNlt0WgPAHwdEVVamc0R0hrcjlGdXRaUXlqRXlJMEE"
            "&usp=sharing"}
-
-importers = [BulkTaskCSVImportForm,
-             BulkTaskGDImportForm,
-             BulkTalkEuropeanaImportForm,
-             BulkTaskEpiCollectPlusImportForm]
 
