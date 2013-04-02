@@ -4,19 +4,13 @@
         <p class="lead">Use one of the following available <strong>templates</strong> to import tasks</p>
     </div>
 </div>
+{% for left_tmpl, right_tmpl in importer_modes %}
 <div class="row-fluid">
     <div class="span6">
-        <div class="well">
-            <h2><i class="icon-edit"></i> Basic</h2> 
-            <h3>Provide your own CSV format file</h3>
-            <p><a href="{{url_for('app.import_task', short_name=app.short_name, template='basic')}}" class="btn btn-inverse">Use the Basic template</a></p>
-        </div>
+      {% include left_tmpl %}
     </div>
     <div class="span6">
-        <div class="well">
-            <h2><i class="icon-globe"></i>Europeana</h2> 
-            <h3>Use the Europeana API to generate tasks</h3>
-            <p><a href="{{url_for('app.import_task', short_name=app.short_name, template='map')}}" class="btn btn-inverse">Use the Europeana API</a></p>
-        </div>
+	  {% include right_tmpl %}
     </div>
 </div>
+{% endfor %}

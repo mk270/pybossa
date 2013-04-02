@@ -19,8 +19,8 @@
           {{ render_field(europeanaform.europeana_search_term, class_="input-xlarge", placeholder="What to search for (e.g., Rembrandt)") }}
           {{ render_field(europeanaform.europeana_api_key, class_="input-xlarge", placeholder="Your API key (e.g., pQiJEj5x0)") }}
           <div class="form-actions">
-            <input type="submit" value="Import" class="btn btn-primary" />
-            <a href="{{ url_for('app.settings', short_name=app.short_name) }}" class="btn">Cancel</a>
+              <input type="submit" value="{{_('Import')}}" class="btn btn-primary" />
+              <a href="{{ url_for('app.settings', short_name=app.short_name) }}" class="btn">{{_('Cancel')}}</a>
           </div>
         </fieldset>
       </form>
