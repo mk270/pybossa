@@ -41,6 +41,22 @@ class BulkImportException(Exception):
     pass
 
 
+googledocs_urls = {
+    'spreadsheet': None,
+    'image': "https://docs.google.com/spreadsheet/ccc"
+             "?key=0AsNlt0WgPAHwdHFEN29mZUF0czJWMUhIejF6dWZXdkE"
+             "&usp=sharing",
+    'sound': "https://docs.google.com/spreadsheet/ccc"
+             "?key=0AsNlt0WgPAHwdEczcWduOXRUb1JUc1VGMmJtc2xXaXc"
+             "&usp=sharing",
+    'map': "https://docs.google.com/spreadsheet/ccc"
+           "?key=0AsNlt0WgPAHwdGZnbjdwcnhKRVNlN1dGXy0tTnNWWXc"
+           "&usp=sharing",
+    'pdf': "https://docs.google.com/spreadsheet/ccc"
+           "?key=0AsNlt0WgPAHwdEVVamc0R0hrcjlGdXRaUXlqRXlJMEE"
+           "&usp=sharing"}
+
+
 class BulkTaskImportForm(Form):
     template_id = None
     form_id = None
@@ -101,6 +117,9 @@ class BulkTaskImportForm(Form):
         csvreader = unicode_csv_reader(csvcontent)
         return self.import_csv_tasks(app, csvreader)
 
+    @property
+    def variants(self):
+        return [self.template_id]
 
 @register_importer
 class BulkTaskCSVImportForm(BulkTaskImportForm):
@@ -143,6 +162,11 @@ class BulkTaskGDImportForm(BulkTaskImportForm):
         r = requests.get(dataurl)
         return self.get_csv_data_from_request(app, r)
 
+    @property
+    def variants(self):
+        return [("-".join([self.template_id, mode]))
+                for mode in googledocs_urls.keys()]
+
 
 @register_importer
 class BulkTaskEpiCollectPlusImportForm(BulkTaskImportForm):
@@ -157,7 +181,7 @@ class BulkTaskEpiCollectPlusImportForm(BulkTaskImportForm):
     template_id = "epicollect"
     form_id = "epiform"
     form_detector = "epicollect_project"
-    
+
     def import_epicollect_tasks(self, app, data):
         for d in data:
             task = model.Task(app=app)
@@ -203,18 +227,4 @@ class BulkTaskEuropeanaImportForm(BulkTaskImportForm):
 
     def handle_import(self, app, form):
         return self.import_csv_tasks(app, self.europeana_reader(form))
-
-googledocs_urls = {
-    'image': "https://docs.google.com/spreadsheet/ccc"
-             "?key=0AsNlt0WgPAHwdHFEN29mZUF0czJWMUhIejF6dWZXdkE"
-             "&usp=sharing",
-    'sound': "https://docs.google.com/spreadsheet/ccc"
-             "?key=0AsNlt0WgPAHwdEczcWduOXRUb1JUc1VGMmJtc2xXaXc"
-             "&usp=sharing",
-    'map': "https://docs.google.com/spreadsheet/ccc"
-           "?key=0AsNlt0WgPAHwdGZnbjdwcnhKRVNlN1dGXy0tTnNWWXc"
-           "&usp=sharing",
-    'pdf': "https://docs.google.com/spreadsheet/ccc"
-           "?key=0AsNlt0WgPAHwdEVVamc0R0hrcjlGdXRaUXlqRXlJMEE"
-           "&usp=sharing"}
 

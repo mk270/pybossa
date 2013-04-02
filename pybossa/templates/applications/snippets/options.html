@@ -4,26 +4,12 @@
         <p class="lead">Use one of the following available <strong>templates</strong> for your application
     </div>
 </div>
+{% for column in presenters | slice(3)%}
 <div class="row-fluid">
-    <div class="span12">
-        <div class="well" style="min-height:211px;">
-            <h2><i class="icon-edit"></i> Basic</h2> 
-            <h3>The most basic template</h3>
-            <p><strong>Complexity</strong>: <i class="icon-star"></i></p>
-            <p><strong>Skills</strong>: HTML and JavaScript</p>
-            <p><a href="{{url_for('app.task_presenter_editor', short_name=app.short_name, template='basic')}}" class="btn btn-inverse">Use the Basic template</a></p>
-        </div>
+    {% for presenter_tmpl in column %}
+    <div class="span6">
+	  {% include presenter_tmpl %}
     </div>
+    {% endfor %}
 </div>
-<div class="row-fluid">
-    <div class="span12">
-        <div class="well">
-            <h2><i class="icon-picture"></i>Cultural Tagging Game</h2> 
-            <h3>Re-use the Flickr Person Finder template</h3>
-            <p><strong>Complexity</strong>: <i class="icon-star"></i><i class="icon-star"></i></p>
-            <p><strong>Skills</strong>: HTML and JavaScript</p>
-            <p><a href="{{url_for('app.task_presenter_editor', short_name=app.short_name, template='cultural-tagging')}}" class="btn btn-inverse">Use the Image template</a></p>
-			<p>&nbsp;</p>
-        </div>
-    </div>
-</div>
+{% endfor %}
