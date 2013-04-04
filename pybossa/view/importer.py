@@ -211,6 +211,6 @@ class BulkTaskEuropeanaImportForm(BulkTaskImportForm):
             europeanaform.europeana_search_term.data):
             yield photo
 
-    def handle_import(self, app, form):
-        return self.import_csv_tasks(app, self.europeana_reader(form))
+    def tasks(self, form):
+        return self.import_csv_tasks(self.europeana_reader(form))
 
