@@ -1,2 +1,2 @@
 
-presenters = ["basic", "image", "sound", "map", "pdf"]
+presenters = ["basic", "image", "sound", "map", "pdf", "cultural-tagging"]
