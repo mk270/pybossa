@@ -136,7 +136,7 @@ body {
 }
 .navbar-fixed-top .navbar-inner,
 .navbar-inner {
-  background: #8bbf36;
+  background: #000000;
   filter: none;
   border: none;
   -webkit-box-shadow: none;
@@ -146,7 +146,7 @@ body {
   font-size: 14px;
 }
 .navbar .brand {
-  padding: 20px 20px 0px 0px;
+  padding: 0px 20px 0px 0px;
   margin: 0px;
   color: #FFF;
   text-shadow: none;
@@ -163,13 +163,13 @@ body {
 }
 .navbar .nav > li > a:hover,
 .navbar .nav > li > a:focus {
-  background-color: #a2d058;
+  background-color: #a2a2a2;
   color: #FFF;
 }
 .navbar .nav > .active > a,
 .navbar .nav > .active > a:hover,
 .navbar .nav > .active > a:focus {
-  background-color: #add56c;
+  background-color: #adadad;
   -webkit-box-shadow: none;
   box-shadow: none;
   color: #FFF;
